@@ -1,0 +1,21 @@
+{
+  "name": "cmu-sharecycle",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CMU ShareCycle - ระบบแลกเปลี่ยนสินค้าสำหรับชุมชน CMU",
+  "scripts": {
+    "start": "./start.sh",
+    "start:backend": "./start-backend.sh",
+    "start:frontend": "./start-frontend.sh",
+    "install:all": "cd backend && npm install && cd ../frontend && npm install",
+    "setup": "npm run install:all && echo '✅ ติดตั้ง dependencies สำเร็จ'"
+  },
+  "keywords": [
+    "cmu",
+    "sharecycle",
+    "exchange",
+    "sustainability"
+  ],
+  "author": "CMU ShareCycle Team G4",
+  "license": "PRIVATE"
+}
