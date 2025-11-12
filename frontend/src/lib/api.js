@@ -42,10 +42,26 @@ export const authApi = {
 
 export const itemsApi = {
   list: () => request('/items'),
+  getById: (itemId) => request(`/items/${itemId}`),
   create: (token, payload) =>
     request('/items', {
       method: 'POST',
       body: JSON.stringify(payload),
+      token,
+    }),
+  update: (token, itemId, payload) =>
+    request(`/items/${itemId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+      token,
+    }),
+  delete: (token, itemId) =>
+    request(`/items/${itemId}`, {
+      method: 'DELETE',
+      token,
+    }),
+  getUserItems: (token, userId) =>
+    request(`/items/user/${userId}`, {
       token,
     }),
 }
@@ -57,11 +73,43 @@ export const exchangeApi = {
       body: JSON.stringify(payload),
       token,
     }),
+  getById: (token, requestId) =>
+    request(`/exchange/${requestId}`, {
+      token,
+    }),
+  getMyRequests: (token) =>
+    request('/exchange/my-requests', {
+      token,
+    }),
+  acceptByOwner: (token, requestId) =>
+    request(`/exchange/${requestId}/accept-owner`, {
+      method: 'POST',
+      token,
+    }),
+  acceptByRequester: (token, requestId) =>
+    request(`/exchange/${requestId}/accept-requester`, {
+      method: 'POST',
+      token,
+    }),
+  reject: (token, requestId) =>
+    request(`/exchange/${requestId}/reject`, {
+      method: 'POST',
+      token,
+    }),
 }
 
 export const notificationApi = {
   list: (token) => request('/notifications', { token }),
   markRead: (token) => request('/notifications/read', { method: 'POST', token }),
+  markNotificationRead: (token, notificationId) =>
+    request(`/notifications/${notificationId}/read`, { method: 'POST', token }),
+  getUnreadCount: (token) => request('/notifications/unread-count', { token }),
+}
+
+export const profileApi = {
+  getProfile: (token) => request('/profile', { token }),
+  getMyItems: (token) => request('/profile/items', { token }),
+  getExchangeHistory: (token) => request('/profile/exchange-history', { token }),
 }
 
 export const chatApi = {
@@ -70,4 +118,3 @@ export const chatApi = {
   list: (token) => request('/chats', { token }),
   messages: (token, chatId) => request(`/chats/${chatId}/messages`, { token }),
 }
-

@@ -14,6 +14,7 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import { itemsApi } from '../lib/api'
+import { calculateItemCO2 } from '../utils/co2Calculator'
 
 export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
   const [searchQuery, setSearchQuery] = useState('')
@@ -257,6 +258,14 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
                       : 'ไม่มีกำหนด'}
                   </div>
                   <div className="text-gray-500">{item.item_condition}</div>
+                  {(item.co2_footprint || (item.category && item.item_condition)) && (
+                    <div className="flex items-center gap-1 text-primary font-semibold">
+                      <Leaf size={14} />
+                      {(item.co2_footprint 
+                        ? parseFloat(item.co2_footprint).toFixed(1) 
+                        : calculateItemCO2(item.category, item.item_condition).toFixed(1))} kg CO₂
+                    </div>
+                  )}
                   <div className="text-gray-500">
                     {item.owner_name || 'CMU Student'}
                     {item.owner_faculty ? ` · ${item.owner_faculty}` : ''}

@@ -7,7 +7,7 @@ export const getChats = async (req, res) => {
   }
 
   const result = await query(
-    `SELECT c.*, u.name AS participant_name, u.email AS participant_email
+    `SELECT c.*, u.name AS participant_name, u.email AS participant_email, u.avatar_url AS participant_avatar_url
      FROM chats c
      JOIN users u ON (CASE WHEN c.creator_id = $1 THEN c.participant_id ELSE c.creator_id END) = u.id
      WHERE c.creator_id = $1 OR c.participant_id = $1

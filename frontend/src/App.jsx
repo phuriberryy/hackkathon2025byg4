@@ -8,6 +8,7 @@ import LoginPage from './pages/LoginPage'
 import HomePage from './pages/HomePage'
 import ProfilePage from './pages/ProfilePage'
 import RegisterPage from './pages/RegisterPage'
+import ExchangeRequestDetailPage from './pages/ExchangeRequestDetailPage'
 import PostItemModal from './components/modals/PostItemModal'
 import ExchangeRequestModal from './components/modals/ExchangeRequestModal'
 import NotificationsModal from './components/modals/NotificationsModal'
@@ -107,6 +108,7 @@ function AppContent() {
             }
           />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/exchange/:requestId" element={<ExchangeRequestDetailPage />} />
         </Routes>
       </main>
       {!isLoginPage && <Footer />}
