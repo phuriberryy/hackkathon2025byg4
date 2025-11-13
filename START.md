@@ -97,3 +97,6 @@ npm start
 - ตรวจสอบว่า DATABASE_URL ถูกต้อง
 - รัน `npm run db:migrate` อีกครั้ง
 
+
+
+

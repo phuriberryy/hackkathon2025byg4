@@ -7,6 +7,11 @@
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
     "db:migrate": "node scripts/migrate.js",
+    "db:test": "node scripts/test-db-connection.js",
+    "db:setup": "node scripts/setup-db.js",
+    "kill:port": "node scripts/kill-port.js",
+    "email:setup": "node scripts/setup-email.js",
+    "email:gmail": "node scripts/setup-gmail.js",
     "test:email": "node scripts/test-email.js"
   },
   "dependencies": {

@@ -68,3 +68,6 @@ export function getAllCO2Footprints() {
   return CO2_BY_CATEGORY
 }
 
+
+
+

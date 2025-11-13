@@ -25,11 +25,12 @@ const env = {
   clientOrigin: parsed.CLIENT_ORIGIN,
   databaseUrl: parsed.DATABASE_URL,
   jwtSecret: parsed.JWT_SECRET,
-  emailHost: parsed.EMAIL_HOST || 'smtp.office365.com',
+  // Email config - ถ้าไม่ตั้งค่า จะใช้ MOCK MODE (แค่ log ใน console)
+  emailHost: parsed.EMAIL_HOST,
   emailPort: parsed.EMAIL_PORT || 587,
-  emailUser: parsed.EMAIL_USER || '',
-  emailPass: parsed.EMAIL_PASS || '',
-  emailFrom: parsed.EMAIL_FROM || parsed.EMAIL_USER || '',
+  emailUser: parsed.EMAIL_USER,
+  emailPass: parsed.EMAIL_PASS,
+  emailFrom: parsed.EMAIL_FROM || parsed.EMAIL_USER,
 }
 
 export default env
