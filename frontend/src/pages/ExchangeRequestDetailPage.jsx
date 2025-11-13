@@ -103,18 +103,20 @@ export default function ExchangeRequestDetailPage() {
                (c.creator_id === exchangeRequest.requester_id && c.participant_id === exchangeRequest.owner_id)
       })
 
-      if (chat) {
-        navigate(`/chat/${chat.id}`)
-      } else {
-        // ถ้ายังไม่มี chat ให้สร้างใหม่
-        const isOwner = exchangeRequest.user_role === 'owner'
-        const otherUserId = isOwner ? exchangeRequest.requester_id : exchangeRequest.owner_id
-        const newChat = await chatApi.create(token, {
-          participantId: otherUserId,
-          itemId: exchangeRequest.item_id,
-        })
-        navigate(`/chat/${newChat.id}`)
-      }
+      const chatId = chat
+        ? chat.id
+        : (
+            await chatApi.create(token, {
+              participantId: exchangeRequest.user_role === 'owner'
+                ? exchangeRequest.requester_id
+                : exchangeRequest.owner_id,
+              itemId: exchangeRequest.item_id,
+              exchangeRequestId: requestId,
+            })
+          ).id
+
+      navigate('/', { replace: true })
+      window.dispatchEvent(new CustomEvent('app:open-chat', { detail: { chatId } }))
     } catch (err) {
       console.error('Failed to start chat:', err)
       alert('ไม่สามารถเปิดแชทได้: ' + (err.message || 'Unknown error'))

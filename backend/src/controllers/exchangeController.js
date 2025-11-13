@@ -2,6 +2,7 @@ import { validationResult } from 'express-validator'
 import { query } from '../db/pool.js'
 import { sendEmail } from '../utils/email.js'
 import { calculateItemCO2, calculateExchangeCO2Reduction } from '../utils/co2Calculator.js'
+import { getChatServer } from '../services/chatService.js'
 
 // สร้างคำขอแลกเปลี่ยน
 export const createExchangeRequest = async (req, res) => {
@@ -544,8 +545,22 @@ async function completeExchange(requestId, exchangeRequest) {
       [exchangeRequest.owner_id, exchangeRequest.requester_id, exchangeRequest.item_id, requestId]
     )
 
-    const chatId = chatResult.rows[0].id
+    const chat = chatResult.rows[0]
+    const chatId = chat.id
     const metadata = JSON.stringify({ exchangeRequestId: requestId, chatId, itemId: exchangeRequest.item_id })
+
+    const io = getChatServer()
+    let ownerUser = null
+    let requesterUser = null
+
+    if (io) {
+      const [ownerUserResult, requesterUserResult] = await Promise.all([
+        query('SELECT id, name, email, avatar_url FROM users WHERE id=$1', [exchangeRequest.owner_id]),
+        query('SELECT id, name, email, avatar_url FROM users WHERE id=$1', [exchangeRequest.requester_id]),
+      ])
+      ownerUser = ownerUserResult.rows[0]
+      requesterUser = requesterUserResult.rows[0]
+    }
 
     // สร้าง notifications สำหรับทั้งสองฝ่าย
     await query(
@@ -563,6 +578,27 @@ async function completeExchange(requestId, exchangeRequest) {
         metadata,
       ]
     )
+
+    if (io) {
+      const chatForOwner = {
+        ...chat,
+        participant_name: requesterUser?.name || 'CMU Student',
+        participant_email: requesterUser?.email || '',
+        participant_avatar_url: requesterUser?.avatar_url || null,
+      }
+
+      const chatForRequester = {
+        ...chat,
+        participant_name: ownerUser?.name || 'CMU Student',
+        participant_email: ownerUser?.email || '',
+        participant_avatar_url: ownerUser?.avatar_url || null,
+      }
+
+      io.to(exchangeRequest.owner_id).emit('chat:created', chatForOwner)
+      io.to(exchangeRequest.requester_id).emit('chat:created', chatForRequester)
+      io.to(exchangeRequest.owner_id).emit('notification:new')
+      io.to(exchangeRequest.requester_id).emit('notification:new')
+    }
 
     // ส่งอีเมลไปยังทั้งสองฝ่าย
     try {

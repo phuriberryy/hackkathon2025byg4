@@ -253,3 +253,6 @@ chmod +x start.sh start-backend.sh start-frontend.sh
 - **Frontend README**: `frontend/README.md`
 - **Database Schema**: `backend/sql/schema.sql`
 
+
+
+

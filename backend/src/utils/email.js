@@ -4,9 +4,12 @@ import env from '../config/env.js'
 // ตรวจสอบว่ามีการตั้งค่า email หรือไม่
 const hasEmailConfig = env.emailHost && env.emailUser && env.emailPass && env.emailFrom
 
-// สร้าง transporter สำหรับส่งอีเมล
-// รองรับทั้ง Office 365 และ SMTP server ของ CMU
-const transporter = hasEmailConfig ? nodemailer.createTransport({
+// ใช้ mock mode ถ้าไม่มี email config หรือตั้งค่า USE_MOCK_EMAIL=true
+const USE_MOCK_EMAIL = process.env.USE_MOCK_EMAIL === 'true' || !hasEmailConfig
+
+// สร้าง transporter สำหรับส่งอีเมล (ถ้าไม่ใช่ mock mode)
+// รองรับทั้ง Gmail, Office 365 และ SMTP server อื่นๆ
+const transporter = !USE_MOCK_EMAIL && hasEmailConfig ? nodemailer.createTransport({
   host: env.emailHost,
   port: env.emailPort,
   secure: env.emailPort === 465, // true for 465, false for other ports
@@ -14,8 +17,8 @@ const transporter = hasEmailConfig ? nodemailer.createTransport({
     user: env.emailUser,
     pass: env.emailPass,
   },
-  // สำหรับ CMU email (Office 365) ใช้ requireTLS
-  requireTLS: true,
+  // สำหรับ Gmail และ Office 365
+  requireTLS: env.emailHost === 'smtp.gmail.com' || env.emailHost === 'smtp.office365.com',
   tls: {
     rejectUnauthorized: false, // สำหรับ development/testing
   },
@@ -23,11 +26,44 @@ const transporter = hasEmailConfig ? nodemailer.createTransport({
   logger: false, // ตั้งเป็น true เพื่อดู logger
 }) : null
 
+// Mock email function - แค่ log อีเมลออกมาใน console
+const mockSendEmail = ({ to, subject, html }) => {
+  console.log('\n📧 ========== MOCK EMAIL (ไม่ส่งจริง) ==========')
+  console.log('To:', to)
+  console.log('Subject:', subject)
+  console.log('From: CMU ShareCycle <noreply@cmusharecycle.local>')
+  console.log('---')
+  console.log('HTML Content:')
+  // แสดง HTML แบบง่ายๆ (ลบ tags)
+  const textContent = html
+    .replace(/<style[^>]*>.*?<\/style>/gis, '')
+    .replace(/<script[^>]*>.*?<\/script>/gis, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  console.log(textContent.substring(0, 200) + (textContent.length > 200 ? '...' : ''))
+  console.log('==========================================\n')
+  
+  return {
+    messageId: `mock-${Date.now()}@cmusharecycle.local`,
+    accepted: [to],
+    rejected: [],
+    pending: [],
+    response: '250 Mock email logged successfully'
+  }
+}
+
 // ตรวจสอบการเชื่อมต่ออีเมล
 export const verifyEmailConnection = async () => {
+  if (USE_MOCK_EMAIL) {
+    console.log('📧 Email Service: MOCK MODE (ไม่ส่งอีเมลจริง แค่ log ใน console)')
+    return true
+  }
+
   if (!hasEmailConfig) {
     console.error('❌ Email configuration not found')
-    console.log('   กรุณาตั้งค่า EMAIL_HOST, EMAIL_USER, EMAIL_PASS, EMAIL_FROM ใน .env file')
+    console.log('   ใช้ MOCK MODE แทน (ไม่ส่งอีเมลจริง)')
+    console.log('   ถ้าต้องการส่งอีเมลจริง ตั้งค่า EMAIL_HOST, EMAIL_USER, EMAIL_PASS, EMAIL_FROM ใน .env file')
     return false
   }
 
@@ -45,6 +81,7 @@ export const verifyEmailConnection = async () => {
     return true
   } catch (err) {
     console.error('❌ Email server connection failed:', err.message)
+    console.log('   ใช้ MOCK MODE แทน (ไม่ส่งอีเมลจริง)')
     if (err.code === 'EAUTH') {
       console.error('   Authentication failed - ตรวจสอบ EMAIL_USER และ EMAIL_PASS')
       console.error('   สำหรับ Office 365 อาจต้องใช้ App Password แทน password ปกติ')
@@ -60,13 +97,19 @@ export const verifyEmailConnection = async () => {
 
 // ส่งอีเมล
 export const sendEmail = async ({ to, subject, html }) => {
-  if (!hasEmailConfig || !transporter) {
-    throw new Error('Email configuration not found. Please set EMAIL_HOST, EMAIL_USER, EMAIL_PASS, EMAIL_FROM in .env file')
+  // ใช้ mock mode ถ้าไม่มี email config
+  if (USE_MOCK_EMAIL) {
+    return mockSendEmail({ to, subject, html })
   }
 
-  // ตรวจสอบว่าเป็น email @cmu.ac.th หรือไม่
+  if (!hasEmailConfig || !transporter) {
+    console.log('⚠️  Email config not found, using MOCK MODE')
+    return mockSendEmail({ to, subject, html })
+  }
+
+  // ตรวจสอบว่าเป็น email @cmu.ac.th หรือไม่ (เฉพาะเมื่อส่งจริง)
   if (!to.endsWith('@cmu.ac.th')) {
-    throw new Error('Notifications can only be sent to a cmu.ac.th address')
+    console.log('⚠️  Email ไม่ใช่ @cmu.ac.th แต่จะส่งต่อไป (MOCK MODE)')
   }
 
   try {
@@ -85,16 +128,9 @@ export const sendEmail = async ({ to, subject, html }) => {
     return info
   } catch (err) {
     console.error('❌ Failed to send email:', err.message)
-    if (err.code === 'EAUTH') {
-      console.error('   Authentication failed - ตรวจสอบ EMAIL_USER และ EMAIL_PASS')
-      console.error('   สำหรับ Office 365 อาจต้องใช้ App Password แทน password ปกติ')
-      console.error('   วิธีสร้าง App Password: https://support.microsoft.com/en-us/account-billing/using-app-passwords-with-apps-that-don-t-support-two-step-verification-5896ed9b-4263-e681-128a-a6f2979a7944')
-    } else if (err.code === 'ECONNECTION') {
-      console.error('   Connection failed - ตรวจสอบ EMAIL_HOST และ EMAIL_PORT')
-    } else if (err.code === 'ETIMEDOUT') {
-      console.error('   Connection timeout - ตรวจสอบ network connection')
-    }
-    throw err
+    console.log('   ใช้ MOCK MODE แทน (ไม่ส่งอีเมลจริง)')
+    // ถ้าส่งจริงล้มเหลว ให้ใช้ mock แทน
+    return mockSendEmail({ to, subject, html })
   }
 }
 

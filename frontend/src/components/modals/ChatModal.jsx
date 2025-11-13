@@ -7,7 +7,7 @@ import { useAuth } from '../../context/AuthContext'
 
 const SOCKET_URL = API_BASE.replace(/\/api$/, '')
 
-export default function ChatModal({ open, onClose }) {
+export default function ChatModal({ open, onClose, initialChatId }) {
   const { token, user } = useAuth()
   const [chats, setChats] = useState([])
   const [messages, setMessages] = useState([])
@@ -50,6 +50,16 @@ export default function ChatModal({ open, onClose }) {
       )
     })
 
+    socket.on('chat:created', (chat) => {
+      setChats((prev) => {
+        if (prev.some((existing) => existing.id === chat.id)) {
+          return prev
+        }
+        return [chat, ...prev]
+      })
+      setActiveChatId(chat.id)
+    })
+
     return () => {
       socket.disconnect()
       socketRef.current = null
@@ -58,6 +68,13 @@ export default function ChatModal({ open, onClose }) {
       activeChatRef.current = null
     }
   }, [token, open])
+
+  useEffect(() => {
+    if (!open) return
+    if (initialChatId) {
+      setActiveChatId(initialChatId)
+    }
+  }, [initialChatId, open])
 
   useEffect(() => {
     if (!token || !activeChatId || !open) return
@@ -209,4 +226,7 @@ export default function ChatModal({ open, onClose }) {
     </Modal>
   )
 }
+
+
+
 

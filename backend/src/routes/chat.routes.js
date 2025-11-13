@@ -5,11 +5,12 @@ import { createChat, getChatMessages, getChats } from '../controllers/chatContro
 
 const router = Router()
 
-router.get('/', authenticate, getChats)
-router.get('/:chatId/messages', authenticate, [param('chatId').isUUID()], getChatMessages)
+router.use(authenticate)
+
+router.get('/', getChats)
+router.get('/:chatId/messages', [param('chatId').isUUID()], getChatMessages)
 router.post(
   '/',
-  authenticate,
   [
     body('participantId')
       .optional()
@@ -22,9 +23,9 @@ router.post(
       }),
     body('participantEmail').optional().isEmail(),
     body('itemId').optional().isUUID(),
+    body('exchangeRequestId').optional().isUUID(),
   ],
   createChat
 )
 
 export default router
-

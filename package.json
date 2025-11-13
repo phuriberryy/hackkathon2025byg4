@@ -8,7 +8,11 @@
     "start:backend": "./start-backend.sh",
     "start:frontend": "./start-frontend.sh",
     "install:all": "cd backend && npm install && cd ../frontend && npm install",
-    "setup": "npm run install:all && echo '✅ ติดตั้ง dependencies สำเร็จ'"
+    "setup": "npm run install:all && echo '✅ ติดตั้ง dependencies สำเร็จ'",
+    "email:setup": "cd backend && npm run email:setup",
+    "email:gmail": "cd backend && npm run email:gmail",
+    "email:update": "cd backend && npm run email:update",
+    "test:email": "cd backend && npm run test:email"
   },
   "keywords": [
     "cmu",

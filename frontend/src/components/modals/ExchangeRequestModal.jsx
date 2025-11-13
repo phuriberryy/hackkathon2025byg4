@@ -41,6 +41,10 @@ export default function ExchangeRequestModal({ open, onClose, itemId }) {
       return
     }
     if (!itemId) return
+    if (!imagePreview) {
+      alert('กรุณาอัปโหลดรูปภาพของไอเทมหรือสิ่งที่จะใช้แลกเปลี่ยนก่อนส่งคำขอ')
+      return
+    }
     setSubmitting(true)
     try {
       await exchangeApi.request(token, { itemId, message })
@@ -94,14 +98,15 @@ export default function ExchangeRequestModal({ open, onClose, itemId }) {
           </label>
           <input
             type="file"
+            name="exchangeItemImage"
             accept="image/*"
             onChange={handleImageChange}
             className="hidden"
-            id="image-upload"
-            required
+            id="exchange-request-image-upload"
+            aria-required="true"
           />
           <label
-            htmlFor="image-upload"
+            htmlFor="exchange-request-image-upload"
             className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 p-12 text-center transition hover:border-primary hover:bg-primary/5"
           >
             {imagePreview ? (
@@ -254,4 +259,7 @@ export default function ExchangeRequestModal({ open, onClose, itemId }) {
     </Modal>
   )
 }
+
+
+
 

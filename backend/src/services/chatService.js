@@ -4,6 +4,8 @@ import { verifyToken } from '../utils/token.js'
 import { query } from '../db/pool.js'
 import { sendEmail } from '../utils/email.js'
 
+let ioInstance = null
+
 export const initChatServer = (server) => {
   const io = new Server(server, {
     cors: {
@@ -89,6 +91,8 @@ export const initChatServer = (server) => {
     })
   })
 
+  ioInstance = io
   return io
 }
 
+export const getChatServer = () => ioInstance

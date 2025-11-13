@@ -7,3 +7,6 @@ export const hashPassword = async (plain) => {
 
 export const comparePassword = (plain, hash) => bcrypt.compare(plain, hash)
 
+
+
+

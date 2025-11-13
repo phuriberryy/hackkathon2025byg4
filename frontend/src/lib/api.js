@@ -38,21 +38,6 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-  forgotPassword: (payload) =>
-    request('/auth/forgot-password', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }),
-  resetPassword: (payload) =>
-    request('/auth/reset-password', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }),
-  resetPasswordDirect: (payload) =>
-    request('/auth/reset-password-direct', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }),
 }
 
 export const itemsApi = {

@@ -8,7 +8,6 @@ import LoginPage from './pages/LoginPage'
 import HomePage from './pages/HomePage'
 import ProfilePage from './pages/ProfilePage'
 import RegisterPage from './pages/RegisterPage'
-import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ExchangeRequestDetailPage from './pages/ExchangeRequestDetailPage'
 import PostItemModal from './components/modals/PostItemModal'
 import ExchangeRequestModal from './components/modals/ExchangeRequestModal'
@@ -25,12 +24,13 @@ function AppContent() {
   const [exchangeRequestOpen, setExchangeRequestOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
+  const [initialChatId, setInitialChatId] = useState(null)
   const [selectedItem, setSelectedItem] = useState(null)
   const [unreadCount, setUnreadCount] = useState(0)
   const [itemsVersion, setItemsVersion] = useState(0)
   const { token, loading } = useAuth()
 
-  const isLoginPage = location.pathname === '/login' || location.pathname === '/forgot-password'
+  const isLoginPage = location.pathname === '/login'
 
   const handlePostItem = () => {
     setPostItemOpen(true)
@@ -73,10 +73,31 @@ function AppContent() {
     socket.on('notification:new', () => {
       setUnreadCount((prev) => prev + 1)
     })
+    socket.on('chat:created', (chat) => {
+      setInitialChatId(chat.id)
+      setChatOpen(true)
+    })
     return () => {
       socket.disconnect()
     }
   }, [token])
+
+  useEffect(() => {
+    const handleOpenChat = (event) => {
+      const chatId = event.detail?.chatId ?? null
+      if (chatId) {
+        setInitialChatId(chatId)
+      } else {
+        setInitialChatId(null)
+      }
+      setChatOpen(true)
+    }
+
+    window.addEventListener('app:open-chat', handleOpenChat)
+    return () => {
+      window.removeEventListener('app:open-chat', handleOpenChat)
+    }
+  }, [])
 
   if (loading) {
     return (
@@ -98,7 +119,6 @@ function AppContent() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route
             path="/"
             element={
@@ -146,7 +166,11 @@ function AppContent() {
       />
       <ChatModal
         open={chatOpen}
-        onClose={() => setChatOpen(false)}
+        onClose={() => {
+          setChatOpen(false)
+          setInitialChatId(null)
+        }}
+        initialChatId={initialChatId}
       />
     </div>
   )
