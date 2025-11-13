@@ -30,7 +30,8 @@ function AppContent() {
   const [itemsVersion, setItemsVersion] = useState(0)
   const { token, loading } = useAuth()
 
-  const isLoginPage = location.pathname === '/login'
+  const isLoginPage = location.pathname === '/login' || location.pathname === '/register'
+  const isAuthenticated = !!token
 
   const handlePostItem = () => {
     setPostItemOpen(true)
@@ -88,7 +89,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen flex flex-col bg-surface">
-      {!isLoginPage && (
+      {isAuthenticated && !isLoginPage && (
         <Header
           unread={unreadCount}
           onNotificationsClick={handleNotificationsClick}
@@ -128,10 +129,10 @@ function AppContent() {
           />
         </Routes>
       </main>
-      {!isLoginPage && <Footer />}
+      {isAuthenticated && !isLoginPage && <Footer />}
 
       {/* Floating Message Button */}
-      {!isLoginPage && (
+      {isAuthenticated && !isLoginPage && (
         <button
           onClick={handleMessageClick}
           className="floating-message-button"
