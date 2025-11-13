@@ -5,10 +5,23 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// Load environment variables
-dotenv.config({ path: path.resolve(__dirname, '../../.env') })
 
-// Import after loading env
+// Load .env from the backend folder (one level up from scripts)
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+
+const {
+  EMAIL_HOST,
+  EMAIL_PORT,
+  EMAIL_USER,
+  EMAIL_PASS
+} = process.env;
+
+if (!EMAIL_HOST || !EMAIL_PORT || !EMAIL_USER || !EMAIL_PASS) {
+  console.error('Missing one or more email env vars. Check EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASS');
+  process.exit(1);
+}
+
+// Import after loading env and checks
 const emailUtils = await import('../src/utils/email.js')
 const { sendTestEmail, verifyEmailConnection } = emailUtils
 
@@ -32,11 +45,11 @@ if (!testEmail.endsWith('@cmu.ac.th')) {
 async function test() {
   console.log('🔍 กำลังตรวจสอบการเชื่อมต่ออีเมล...')
   console.log('')
-  
+
   try {
     const isConnected = await verifyEmailConnection()
     console.log('')
-    
+
     if (!isConnected) {
       console.error('❌ ไม่สามารถเชื่อมต่อกับ email server ได้')
       console.log('')

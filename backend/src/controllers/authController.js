@@ -2,7 +2,7 @@ import { validationResult } from 'express-validator'
 import { query } from '../db/pool.js'
 import { hashPassword, comparePassword } from '../utils/password.js'
 import { signToken } from '../utils/token.js'
-import { sendEmail } from '../utils/email.js'
+//import { sendEmail } from '../utils/email.js'
 
 export const register = async (req, res) => {
   const errors = validationResult(req)
@@ -32,11 +32,11 @@ export const register = async (req, res) => {
   const user = result.rows[0]
   const token = signToken({ id: user.id, email: user.email, name: user.name })
 
-  await sendEmail({
-    to: user.email,
-    subject: 'Welcome to CMU ShareCycle',
-    html: `<p>สวัสดี ${user.name},</p><p>บัญชีของคุณพร้อมใช้งานแล้ว เริ่มแลกเปลี่ยนเพื่อช่วยลดขยะกันเลย!</p>`,
-  })
+  // await sendEmail({
+  //   to: user.email,
+  //   subject: 'Welcome to CMU ShareCycle',
+  //   html: `<p>สวัสดี ${user.name},</p><p>บัญชีของคุณพร้อมใช้งานแล้ว เริ่มแลกเปลี่ยนเพื่อช่วยลดขยะกันเลย!</p>`,
+  // })
 
   return res.status(201).json({ user, token })
 }
