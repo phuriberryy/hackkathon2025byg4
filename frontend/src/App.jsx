@@ -8,6 +8,7 @@ import LoginPage from './pages/LoginPage'
 import HomePage from './pages/HomePage'
 import ProfilePage from './pages/ProfilePage'
 import RegisterPage from './pages/RegisterPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ExchangeRequestDetailPage from './pages/ExchangeRequestDetailPage'
 import PostItemModal from './components/modals/PostItemModal'
 import ExchangeRequestModal from './components/modals/ExchangeRequestModal'
@@ -29,7 +30,7 @@ function AppContent() {
   const [itemsVersion, setItemsVersion] = useState(0)
   const { token, loading } = useAuth()
 
-  const isLoginPage = location.pathname === '/login'
+  const isLoginPage = location.pathname === '/login' || location.pathname === '/forgot-password'
 
   const handlePostItem = () => {
     setPostItemOpen(true)
@@ -97,6 +98,7 @@ function AppContent() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route
             path="/"
             element={
