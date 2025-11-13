@@ -13,6 +13,7 @@ import PostItemModal from './components/modals/PostItemModal'
 import ExchangeRequestModal from './components/modals/ExchangeRequestModal'
 import NotificationsModal from './components/modals/NotificationsModal'
 import ChatModal from './components/modals/ChatModal'
+import ProtectedRoute from './components/auth/ProtectedRoute'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { API_BASE, notificationApi } from './lib/api'
 
@@ -100,15 +101,31 @@ function AppContent() {
           <Route
             path="/"
             element={
-              <HomePage 
-                onExchangeItem={handleExchangeItem}
-                onPostItem={handlePostItem}
-                refreshKey={itemsVersion}
-              />
+              <ProtectedRoute>
+                <HomePage 
+                  onExchangeItem={handleExchangeItem}
+                  onPostItem={handlePostItem}
+                  refreshKey={itemsVersion}
+                />
+              </ProtectedRoute>
             }
           />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/exchange/:requestId" element={<ExchangeRequestDetailPage />} />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/exchange/:requestId"
+            element={
+              <ProtectedRoute>
+                <ExchangeRequestDetailPage />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </main>
       {!isLoginPage && <Footer />}

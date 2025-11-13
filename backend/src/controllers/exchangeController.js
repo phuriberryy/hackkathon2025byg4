@@ -70,18 +70,35 @@ export const createExchangeRequest = async (req, res) => {
     try {
       await sendEmail({
         to: item.email,
-        subject: 'มีคำขอแลกเปลี่ยนใหม่บน CMU ShareCycle',
+        subject: `[CMU ShareCycle] มีคำขอแลกเปลี่ยนใหม่ - ${item.title}`,
         html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #2D7D3F;">มีคำขอแลกเปลี่ยนใหม่</h2>
-            <p>สวัสดี ${item.name},</p>
-            <p><strong>${req.user.name}</strong> ขอแลกเปลี่ยนสำหรับสินค้า "<strong>${item.title}</strong>"</p>
-            ${message ? `<p><strong>ข้อความ:</strong> ${message}</p>` : ''}
-            <p>กรุณาเข้าสู่ระบบเพื่อดูรายละเอียดและยอมรับ/ปฏิเสธคำขอ</p>
-            <p style="margin-top: 30px; color: #666; font-size: 12px;">
-              CMU ShareCycle - Green Campus<br>
-              <a href="http://localhost:3000" style="color: #2D7D3F;">เข้าสู่ระบบ</a>
-            </p>
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background-color: #2D7D3F; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
+              <h1 style="margin: 0; font-size: 24px;">CMU ShareCycle</h1>
+              <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">Green Campus Exchange Platform</p>
+            </div>
+            <div style="background-color: #f9f9f9; padding: 30px; border: 1px solid #e0e0e0; border-top: none;">
+              <h2 style="color: #2D7D3F; margin-top: 0;">มีคำขอแลกเปลี่ยนใหม่</h2>
+              <p style="font-size: 16px; line-height: 1.6;">สวัสดี <strong>${item.name}</strong>,</p>
+              <p style="font-size: 16px; line-height: 1.6;">
+                <strong>${req.user.name}</strong> สนใจแลกเปลี่ยนสินค้า "<strong>${item.title}</strong>" กับคุณ
+              </p>
+              ${message ? `
+                <div style="background-color: #fff; border-left: 4px solid #2D7D3F; padding: 15px; margin: 20px 0;">
+                  <p style="margin: 0; font-size: 14px; color: #666;"><strong>ข้อความจากผู้ขอแลกเปลี่ยน:</strong></p>
+                  <p style="margin: 10px 0 0 0; font-size: 16px; line-height: 1.6;">${message}</p>
+                </div>
+              ` : ''}
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="http://localhost:3000" style="display: inline-block; background-color: #2D7D3F; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">เข้าสู่ระบบเพื่อดูรายละเอียด</a>
+              </div>
+            </div>
+            <div style="background-color: #f5f5f5; padding: 15px; border-radius: 0 0 8px 8px; border: 1px solid #e0e0e0; border-top: none; text-align: center;">
+              <p style="margin: 0; font-size: 12px; color: #666;">
+                อีเมลนี้ส่งจากระบบ CMU ShareCycle<br>
+                หากอีเมลนี้ตกใน Junk/Spam กรุณา mark เป็น "Not Junk" เพื่อรับอีเมลในอนาคต
+              </p>
+            </div>
           </div>
         `,
       })

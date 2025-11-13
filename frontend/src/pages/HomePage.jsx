@@ -12,6 +12,8 @@ import {
   Zap,
   Clock3,
   ChevronDown,
+  MapPin,
+  User as UserIcon,
 } from 'lucide-react'
 import { itemsApi } from '../lib/api'
 import { calculateItemCO2 } from '../utils/co2Calculator'
@@ -158,11 +160,6 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <button className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark">
-              <Search size={16} />
-              <span>ค้นหา</span>
-            </button>
-
             <div className="relative">
               <select
                 value={selectedCategory}
@@ -193,6 +190,11 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
               <ChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             </div>
 
+            <button className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark">
+              <Search size={16} />
+              <span>ค้นหา</span>
+            </button>
+
             <button
               onClick={onPostItem}
               className="inline-flex items-center gap-2 rounded-full bg-[#0E8B43] px-6 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-[#0B6C33]"
@@ -215,13 +217,13 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
           </div>
         )}
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {filteredItems.map((item) => (
             <article
               key={item.id}
-              className="overflow-hidden rounded-[36px] border border-white/60 bg-white shadow-soft transition hover:-translate-y-1 hover:shadow-card"
+              className="flex flex-col overflow-hidden rounded-2xl border border-white/60 bg-white shadow-soft transition hover:-translate-y-1 hover:shadow-card"
             >
-              <div className="relative h-64 w-full overflow-hidden">
+              <div className="relative aspect-[4/3] w-full overflow-hidden">
                 <img
                   src={
                     item.image_url ||
@@ -230,58 +232,76 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
                   alt={item.title}
                   className="h-full w-full object-cover"
                 />
-                <div className="absolute left-6 top-6 flex flex-wrap gap-2">
-                  <span className="rounded-full bg-black/70 px-3 py-1 text-xs font-semibold text-white">
-                    {item.available_until
-                      ? `ถึง ${new Date(item.available_until).toLocaleDateString('th-TH')}`
-                      : 'พร้อมแลก'}
-                  </span>
+                {/* Badge ซ้ายบน: เหลือ X วัน หรือ หมดอายุแล้ว */}
+                <div className="absolute left-4 top-4">
+                  {(() => {
+                    if (!item.available_until) {
+                      return null
+                    }
+                    const today = new Date()
+                    const expiryDate = new Date(item.available_until)
+                    const diffTime = expiryDate - today
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+                    
+                    if (diffDays < 0) {
+                      return (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1.5 text-sm font-semibold text-red-700">
+                          <Clock3 size={16} />
+                          หมดอายุแล้ว
+                        </span>
+                      )
+                    } else if (diffDays <= 7) {
+                      return (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-yellow-100 px-3 py-1.5 text-sm font-semibold text-yellow-700">
+                          <Clock3 size={16} />
+                          เหลือ {diffDays} วัน
+                        </span>
+                      )
+                    }
+                    return null
+                  })()}
                 </div>
-                <span className="absolute right-6 top-6 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-white">
-                  Active
+                {/* Badge ขวาบน: Exchange */}
+                <span className="absolute right-4 top-4 rounded-full bg-primary px-3 py-1.5 text-sm font-semibold text-white">
+                  Exchange
                 </span>
               </div>
-              <div className="space-y-4 p-8">
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
+              <div className="flex flex-1 flex-col space-y-4 p-5">
+                {/* Category Badge */}
+                <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-sm font-semibold text-primary">
                   <Zap size={14} />
                   {item.category}
                 </div>
-                <div>
-                  <h3 className="text-2xl font-semibold text-gray-900">{item.title}</h3>
-                  <p className="mt-2 text-sm text-gray-500">{item.description}</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-4 rounded-2xl bg-surface px-4 py-3 text-sm font-medium text-gray-700">
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <Clock3 size={16} className="text-primary" />
-                    {item.available_until
-                      ? `หมดอายุ ${new Date(item.available_until).toLocaleDateString('th-TH')}`
-                      : 'ไม่มีกำหนด'}
+                
+                {/* Title */}
+                <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">{item.title}</h3>
+                
+                {/* Details: Condition, Location, Seller */}
+                <div className="flex-1 space-y-2.5 text-base text-gray-600">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">Condition:</span>
+                    <span>{item.item_condition}</span>
                   </div>
-                  <div className="text-gray-500">{item.item_condition}</div>
-                  {(item.co2_footprint || (item.category && item.item_condition)) && (
-                    <div className="flex items-center gap-1 text-primary font-semibold">
-                      <Leaf size={14} />
-                      {(item.co2_footprint 
-                        ? parseFloat(item.co2_footprint).toFixed(1) 
-                        : calculateItemCO2(item.category, item.item_condition).toFixed(1))} kg CO₂
+                  {item.pickup_location && (
+                    <div className="flex items-center gap-2">
+                      <MapPin size={18} className="text-gray-400" />
+                      <span className="truncate">{item.pickup_location}</span>
                     </div>
                   )}
-                  <div className="text-gray-500">
-                    {item.owner_name || 'CMU Student'}
-                    {item.owner_faculty ? ` · ${item.owner_faculty}` : ''}
+                  <div className="flex items-center gap-2">
+                    <UserIcon size={18} className="text-gray-400" />
+                    <span className="truncate">{item.owner_name || 'CMU Student'}</span>
                   </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-primary">
-                    ต้องการ: {item.looking_for || 'เปิดรับข้อเสนอ'}
-                  </span>
-                  <button
-                    onClick={() => onExchangeItem(item.id)}
-                    className="rounded-full border border-primary/30 bg-white px-5 py-2 text-sm font-semibold text-primary shadow-sm transition hover:bg-primary hover:text-white"
-                  >
-                    Exchange Item
-                  </button>
-                </div>
+                
+                {/* Exchange Button */}
+                <button
+                  onClick={() => onExchangeItem(item.id)}
+                  className="mt-auto flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-base font-semibold text-white shadow-md transition hover:bg-primary-dark"
+                >
+                  <RefreshCcw size={20} />
+                  Exchange
+                </button>
               </div>
             </article>
           ))}

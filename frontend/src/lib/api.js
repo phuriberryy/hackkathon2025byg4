@@ -64,6 +64,10 @@ export const itemsApi = {
     request(`/items/user/${userId}`, {
       token,
     }),
+  getItemExchangeRequests: (token, itemId) =>
+    request(`/items/${itemId}/exchange-requests`, {
+      token,
+    }),
 }
 
 export const exchangeApi = {
@@ -108,6 +112,12 @@ export const notificationApi = {
 
 export const profileApi = {
   getProfile: (token) => request('/profile', { token }),
+  updateProfile: (token, payload) =>
+    request('/profile', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+      token,
+    }),
   getMyItems: (token) => request('/profile/items', { token }),
   getExchangeHistory: (token) => request('/profile/exchange-history', { token }),
 }

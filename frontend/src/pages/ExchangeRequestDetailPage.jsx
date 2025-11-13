@@ -371,7 +371,7 @@ export default function ExchangeRequestDetailPage() {
               <button
                 onClick={handleAccept}
                 disabled={processing}
-                className="flex-1 rounded-full bg-green-500 px-6 py-4 text-lg font-semibold text-white shadow-card transition hover:bg-green-600 disabled:opacity-50"
+                className="flex-1 rounded-full bg-[#0E8B43] px-6 py-4 text-lg font-semibold text-white shadow-card transition hover:bg-[#0B6C33] disabled:opacity-50"
               >
                 <div className="flex items-center justify-center gap-2">
                   <CheckCircle size={24} />
@@ -381,7 +381,7 @@ export default function ExchangeRequestDetailPage() {
               <button
                 onClick={handleReject}
                 disabled={processing}
-                className="flex-1 rounded-full bg-red-500 px-6 py-4 text-lg font-semibold text-white shadow-card transition hover:bg-red-600 disabled:opacity-50"
+                className="flex-1 rounded-full bg-[#DC2626] px-6 py-4 text-lg font-semibold text-white shadow-card transition hover:bg-[#B91C1C] disabled:opacity-50"
               >
                 <div className="flex items-center justify-center gap-2">
                   <XCircle size={24} />

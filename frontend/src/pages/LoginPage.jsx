@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -11,7 +11,14 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { login, token, loading } = useAuth()
+
+  // ถ้า login แล้ว ให้ redirect ไปหน้า home
+  useEffect(() => {
+    if (!loading && token) {
+      navigate('/', { replace: true })
+    }
+  }, [token, loading, navigate])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -138,6 +145,7 @@ export default function LoginPage() {
     </div>
   )
 }
+
 
 
 

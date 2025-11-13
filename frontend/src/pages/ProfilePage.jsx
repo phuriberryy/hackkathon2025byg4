@@ -1,7 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
 import {
-  Settings,
-  Edit2,
   ArrowRightLeft,
   User,
   Mail,
@@ -16,6 +14,8 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { profileApi, itemsApi, exchangeApi } from '../lib/api'
+import EditItemModal from '../components/modals/EditItemModal'
+import ManageItemModal from '../components/modals/ManageItemModal'
 
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState('posts')
@@ -24,6 +24,9 @@ export default function ProfilePage() {
   const [exchangeHistory, setExchangeHistory] = useState([])
   const [exchangeRequests, setExchangeRequests] = useState([])
   const [loading, setLoading] = useState(true)
+  const [showEditItemModal, setShowEditItemModal] = useState(false)
+  const [showManageItemModal, setShowManageItemModal] = useState(false)
+  const [selectedItem, setSelectedItem] = useState(null)
   const { user, token } = useAuth()
 
   useEffect(() => {
@@ -112,15 +115,28 @@ export default function ProfilePage() {
     }
   }
 
-  const handleEditItem = (itemId) => {
-    // TODO: เปิด modal สำหรับแก้ไข item
-    alert('ฟีเจอร์แก้ไขโพสต์จะเปิดให้ใช้งานเร็วๆ นี้')
+  const handleEditItem = (item) => {
+    setSelectedItem(item)
+    setShowEditItemModal(true)
   }
 
-  const handleManageItem = (itemId) => {
-    // TODO: เปิด modal สำหรับจัดการ item (ดู exchange requests, etc.)
-    alert('ฟีเจอร์จัดการโพสต์จะเปิดให้ใช้งานเร็วๆ นี้')
+  const handleManageItem = (item) => {
+    setSelectedItem(item)
+    setShowManageItemModal(true)
   }
+
+  const handleItemUpdate = async () => {
+    // Refresh items list
+    if (token && activeTab === 'posts') {
+      try {
+        const data = await profileApi.getMyItems(token)
+        setMyItems(data)
+      } catch (err) {
+        console.error('Failed to refresh items:', err)
+      }
+    }
+  }
+
 
   const initials = useMemo(() => {
     if (!user?.name) return 'YO'
@@ -178,61 +194,45 @@ export default function ProfilePage() {
                 </div>
               </div>
             </div>
-
-            <div className="flex items-center gap-3">
-              <button className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50">
-                <Edit2 size={16} />
-                Edit Profile
-              </button>
-              <button className="rounded-full border border-gray-200 p-3 text-gray-500 shadow-sm transition hover:bg-gray-50">
-                <Settings size={18} />
-              </button>
-            </div>
           </div>
 
-          <div className="mt-8 flex flex-col gap-6 border-t border-gray-100 pt-6 sm:flex-row">
-            <div>
+          <div className="mt-8 flex flex-col gap-6 border-t border-gray-100 pt-6 sm:flex-row sm:justify-center">
+            <div className="text-center">
               <p className="text-4xl font-bold text-primary">{stats.itemsShared || 0}</p>
               <p className="text-sm text-gray-500">Items Shared</p>
             </div>
-            <div>
+            <div className="text-center">
               <p className="text-4xl font-bold text-primary">{stats.co2Reduced || '0.00'}kg</p>
               <p className="text-sm text-gray-500">CO₂ Reduced</p>
-            </div>
-            <div>
-              <p className="text-4xl font-bold text-primary">Level {Math.floor((stats.itemsShared || 0) / 5) + 1}</p>
-              <p className="text-sm text-gray-500">Community Impact</p>
             </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-3 border-t border-gray-100 px-8 py-4">
-          <button
-            onClick={() => setActiveTab('posts')}
-            className={`inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition ${
-              activeTab === 'posts'
-                ? 'bg-primary text-white shadow-card'
-                : 'bg-surface text-gray-700 hover:bg-primary/10'
-            }`}
-          >
-            <Package size={16} />
-            โพสต์ของฉัน
-          </button>
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition ${
-              activeTab === 'history'
-                ? 'bg-primary text-white shadow-card'
-                : 'bg-surface text-gray-700 hover:bg-primary/10'
-            }`}
-          >
-            <ArrowRightLeft size={16} />
-            ประวัติการแลกเปลี่ยน
-          </button>
-          <span className="inline-flex items-center gap-2 rounded-full bg-surface-light px-4 py-2 text-xs font-semibold text-primary">
-            <ShieldCheck size={14} />
-            Verified CMU Student
-          </span>
+        <div className="flex items-center gap-4 border-t border-gray-100 px-8 py-4">
+          <div className="flex flex-1 items-center justify-center gap-2 rounded-full bg-[#F0F7F1] px-4 py-2">
+            <button
+              onClick={() => setActiveTab('posts')}
+              className={`flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                activeTab === 'posts'
+                  ? 'bg-gray-200 text-gray-800'
+                  : 'bg-transparent text-gray-700'
+              }`}
+            >
+              <Package size={16} />
+              โพสต์ของฉัน
+            </button>
+            <button
+              onClick={() => setActiveTab('history')}
+              className={`flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                activeTab === 'history'
+                  ? 'bg-gray-200 text-gray-800'
+                  : 'bg-transparent text-gray-700'
+              }`}
+            >
+              <ArrowRightLeft size={16} />
+              ประวัติการแลกเปลี่ยน
+            </button>
+          </div>
         </div>
       </section>
 
@@ -297,13 +297,13 @@ export default function ProfilePage() {
                         {/* Action Buttons */}
                         <div className="flex gap-2">
                           <button
-                            onClick={() => handleManageItem(item.id)}
+                            onClick={() => handleManageItem(item)}
                             className="flex-1 rounded-full bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/20"
                           >
                             จัดการ
                           </button>
                           <button
-                            onClick={() => handleEditItem(item.id)}
+                            onClick={() => handleEditItem(item)}
                             className="flex-1 rounded-full bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
                           >
                             แก้ไข
@@ -371,6 +371,28 @@ export default function ProfilePage() {
           </div>
         )}
       </div>
+
+      {/* Edit Item Modal */}
+      <EditItemModal
+        open={showEditItemModal}
+        onClose={() => {
+          setShowEditItemModal(false)
+          setSelectedItem(null)
+        }}
+        item={selectedItem}
+        onSuccess={handleItemUpdate}
+      />
+
+      {/* Manage Item Modal */}
+      <ManageItemModal
+        open={showManageItemModal}
+        onClose={() => {
+          setShowManageItemModal(false)
+          setSelectedItem(null)
+        }}
+        item={selectedItem}
+        onUpdate={handleItemUpdate}
+      />
     </div>
   )
 }

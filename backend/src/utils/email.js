@@ -113,13 +113,30 @@ export const sendEmail = async ({ to, subject, html }) => {
   }
 
   try {
+    // กำหนด from address ให้ถูกต้อง
+    const fromAddress = env.emailFrom && env.emailFrom.includes('@')
+      ? env.emailFrom
+      : env.emailUser
+
     const info = await transporter.sendMail({
-      from: env.emailFrom.includes('@') 
-        ? `"CMU ShareCycle" <${env.emailFrom}>`
-        : `"CMU ShareCycle" <${env.emailUser}>`,
+      from: `"CMU ShareCycle" <${fromAddress}>`,
       to,
       subject,
       html,
+      // เพิ่ม headers เพื่อลดโอกาสตก Junk/Spam
+      headers: {
+        'X-Priority': '3', // Normal priority
+        'X-MSMail-Priority': 'Normal',
+        'Importance': 'normal',
+        'X-Mailer': 'CMU ShareCycle',
+        'X-Auto-Response-Suppress': 'All',
+        // เพิ่ม Reply-To เพื่อให้ผู้รับสามารถตอบกลับได้
+        'Reply-To': fromAddress,
+      },
+      // ตั้งค่า replyTo
+      replyTo: fromAddress,
+      // เพิ่ม text version สำหรับ email clients ที่ไม่รองรับ HTML
+      text: html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim(),
     })
 
     console.log('✅ Email sent successfully:', info.messageId)

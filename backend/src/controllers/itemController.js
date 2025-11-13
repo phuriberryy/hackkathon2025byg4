@@ -183,6 +183,47 @@ export const deleteItem = async (req, res) => {
   }
 }
 
+// ดึง exchange requests ของ item
+export const getItemExchangeRequests = async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Unauthorized' })
+  }
+
+  const { itemId } = req.params
+
+  try {
+    // ตรวจสอบว่า item เป็นของ user นี้หรือไม่
+    const itemCheck = await query('SELECT user_id FROM items WHERE id=$1', [itemId])
+    if (!itemCheck.rowCount) {
+      return res.status(404).json({ message: 'Item not found' })
+    }
+
+    if (itemCheck.rows[0].user_id !== req.user.id) {
+      return res.status(403).json({ message: 'You can only view exchange requests for your own items' })
+    }
+
+    const result = await query(
+      `SELECT 
+        er.*,
+        u.name as requester_name,
+        u.email as requester_email,
+        u.faculty as requester_faculty,
+        i.title as item_title
+       FROM exchange_requests er
+       JOIN users u ON er.requester_id = u.id
+       JOIN items i ON er.item_id = i.id
+       WHERE er.item_id = $1
+       ORDER BY er.created_at DESC`,
+      [itemId]
+    )
+
+    return res.json(result.rows)
+  } catch (err) {
+    console.error('Get item exchange requests error:', err)
+    return res.status(500).json({ message: 'Internal server error' })
+  }
+}
+
 // ดึง items ของผู้ใช้
 export const getUserItems = async (req, res) => {
   if (!req.user) {

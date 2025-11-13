@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Mail, Lock, User } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -9,7 +9,14 @@ export default function RegisterPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
-  const { register } = useAuth()
+  const { register, token, loading } = useAuth()
+
+  // ถ้า login แล้ว ให้ redirect ไปหน้า home
+  useEffect(() => {
+    if (!loading && token) {
+      navigate('/', { replace: true })
+    }
+  }, [token, loading, navigate])
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -62,14 +69,37 @@ export default function RegisterPage() {
 
             <div>
               <label className="mb-2 block text-sm font-semibold text-gray-900">คณะ/หน่วยงาน</label>
-              <input
-                type="text"
+              <select
                 name="faculty"
                 value={form.faculty}
                 onChange={handleChange}
-                placeholder="Faculty of Medicine"
-                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-0"
-              />
+                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-0"
+              >
+                <option value="">เลือกคณะ/หน่วยงาน</option>
+                <option value="คณะมนุษยศาสตร์">คณะมนุษยศาสตร์</option>
+                <option value="คณะศึกษาศาสตร์">คณะศึกษาศาสตร์</option>
+                <option value="คณะวิจิตรศิลป์">คณะวิจิตรศิลป์</option>
+                <option value="คณะสังคมศาสตร์">คณะสังคมศาสตร์</option>
+                <option value="คณะวิทยาศาสตร์">คณะวิทยาศาสตร์</option>
+                <option value="คณะวิศวกรรมศาสตร์">คณะวิศวกรรมศาสตร์</option>
+                <option value="คณะแพทยศาสตร์">คณะแพทยศาสตร์</option>
+                <option value="คณะเกษตรศาสตร์">คณะเกษตรศาสตร์</option>
+                <option value="คณะทันตแพทยศาสตร์">คณะทันตแพทยศาสตร์</option>
+                <option value="คณะเภสัชศาสตร์">คณะเภสัชศาสตร์</option>
+                <option value="คณะเทคนิคการแพทย์">คณะเทคนิคการแพทย์</option>
+                <option value="คณะพยาบาลศาสตร์">คณะพยาบาลศาสตร์</option>
+                <option value="คณะอุตสาหกรรมเกษตร">คณะอุตสาหกรรมเกษตร</option>
+                <option value="คณะสัตวแพทยศาสตร์">คณะสัตวแพทยศาสตร์</option>
+                <option value="คณะบริหารธุรกิจ">คณะบริหารธุรกิจ</option>
+                <option value="คณะเศรษฐศาสตร์">คณะเศรษฐศาสตร์</option>
+                <option value="คณะสถาปัตยกรรมศาสตร์">คณะสถาปัตยกรรมศาสตร์</option>
+                <option value="คณะการสื่อสารมวลชน">คณะการสื่อสารมวลชน</option>
+                <option value="คณะรัฐศาสตร์และรัฐประศาสนศาสตร์">คณะรัฐศาสตร์และรัฐประศาสนศาสตร์</option>
+                <option value="คณะนิติศาสตร์">คณะนิติศาสตร์</option>
+                <option value="วิทยาลัยศิลปะ สื่อ และเทคโนโลยี">วิทยาลัยศิลปะ สื่อ และเทคโนโลยี</option>
+                <option value="วิทยาลัยนานาชาติ">วิทยาลัยนานาชาติ</option>
+                <option value="วิทยาลัยพหุวิทยาการและสหวิทยาการ">วิทยาลัยพหุวิทยาการและสหวิทยาการ</option>
+              </select>
             </div>
 
             <div>

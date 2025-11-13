@@ -42,8 +42,18 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => persist(null, null)
 
+  const updateUser = (updatedUser) => {
+    if (token) {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        persist(updatedUser, parsed.token)
+      }
+    }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   )
@@ -56,6 +66,7 @@ export const useAuth = () => {
   }
   return ctx
 }
+
 
 
 
