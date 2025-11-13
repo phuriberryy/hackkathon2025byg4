@@ -12,6 +12,8 @@
     "kill:port": "node scripts/kill-port.js",
     "email:setup": "node scripts/setup-email.js",
     "email:gmail": "node scripts/setup-gmail.js",
+    "email:update": "node scripts/update-email-password.js",
+    "email:fix": "node scripts/fix-email-config.js",
     "test:email": "node scripts/test-email.js"
   },
   "dependencies": {

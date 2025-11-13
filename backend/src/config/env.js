@@ -13,7 +13,8 @@ const schema = z.object({
   JWT_SECRET: z.string().min(16),
   EMAIL_HOST: z.string().min(1).optional(),
   EMAIL_PORT: z.coerce.number().default(587).optional(),
-  EMAIL_USER: z.string().email().optional(),
+  // EMAIL_USER ไม่ต้องเป็น email format เสมอ (บาง service ใช้ username)
+  EMAIL_USER: z.string().min(1).optional(),
   EMAIL_PASS: z.string().min(1).optional(),
   EMAIL_FROM: z.string().min(1).optional(),
 })
