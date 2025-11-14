@@ -53,7 +53,11 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
     setLoading(true)
     itemsApi
       .list()
-      .then(setItems)
+      .then((data) => {
+        console.log('Items loaded:', data)
+        console.log('Items with in_progress status:', data.filter(item => item.status === 'in_progress'))
+        setItems(data)
+      })
       .catch(() => setItems([]))
       .finally(() => setLoading(false))
   }, [refreshKey])
@@ -218,10 +222,20 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
         )}
 
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredItems.map((item) => (
+          {filteredItems.map((item) => {
+            const isInProgress = item.status === 'in_progress'
+            // Debug log
+            if (isInProgress) {
+              console.log('Item in progress:', item.id, item.title, item.status)
+            }
+            return (
             <article
               key={item.id}
-              className="flex flex-col overflow-hidden rounded-2xl border border-white/60 bg-white shadow-soft transition hover:-translate-y-1 hover:shadow-card"
+              className={`flex flex-col overflow-hidden rounded-2xl border border-white/60 bg-white shadow-soft transition ${
+                isInProgress 
+                  ? 'opacity-60 grayscale-[30%] cursor-not-allowed' 
+                  : 'hover:-translate-y-1 hover:shadow-card'
+              }`}
             >
               <div className="relative aspect-[4/3] w-full overflow-hidden">
                 <img
@@ -262,8 +276,8 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
                   })()}
                 </div>
                 {/* Badge ขวาบน: Exchange หรือ กำลังดำเนินการ */}
-                {item.status === 'in_progress' ? (
-                  <span className="absolute right-4 top-4 rounded-full bg-yellow-500 px-3 py-1.5 text-sm font-semibold text-white">
+                {isInProgress ? (
+                  <span className="absolute right-4 top-4 rounded-full bg-yellow-500 px-3 py-1.5 text-sm font-semibold text-white shadow-md">
                     กำลังดำเนินการ
                   </span>
                 ) : (
@@ -301,16 +315,27 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
                 </div>
                 
                 {/* Exchange Button */}
-                <button
-                  onClick={() => onExchangeItem(item.id)}
-                  className="mt-auto flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-base font-semibold text-white shadow-md transition hover:bg-primary-dark"
-                >
-                  <RefreshCcw size={20} />
-                  Exchange
-                </button>
+                {isInProgress ? (
+                  <button
+                    disabled
+                    className="mt-auto flex w-full items-center justify-center gap-2 rounded-lg bg-gray-300 px-5 py-3 text-base font-semibold text-gray-500 shadow-md cursor-not-allowed"
+                  >
+                    <RefreshCcw size={20} />
+                    กำลังดำเนินการ
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => onExchangeItem(item.id)}
+                    className="mt-auto flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-base font-semibold text-white shadow-md transition hover:bg-primary-dark"
+                  >
+                    <RefreshCcw size={20} />
+                    Exchange
+                  </button>
+                )}
               </div>
             </article>
-          ))}
+            )
+          })}
         </div>
       </section>
     </div>
