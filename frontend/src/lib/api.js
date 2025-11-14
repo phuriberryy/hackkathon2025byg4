@@ -142,4 +142,14 @@ export const chatApi = {
     request('/chats', { method: 'POST', body: JSON.stringify(payload), token }),
   list: (token) => request('/chats', { token }),
   messages: (token, chatId) => request(`/chats/${chatId}/messages`, { token }),
+  accept: (token, chatId) =>
+    request(`/chats/${chatId}/accept`, { method: 'PATCH', token }),
+  decline: (token, chatId) =>
+    request(`/chats/${chatId}/decline`, { method: 'PATCH', token }),
+  confirmQr: (token, chatId, payload) =>
+    request(`/chats/${chatId}/confirm`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      token,
+    }),
 }

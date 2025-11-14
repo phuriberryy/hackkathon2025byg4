@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
-import { Scanner as QrScanner } from '@yudiel/react-qr-scanner'
+import { Html5Qrcode } from 'html5-qrcode'
 import { io } from 'socket.io-client'
 import { Send, MessageCircle, Loader2, Check, X, QrCode } from 'lucide-react'
 import Modal from '../ui/Modal'
@@ -28,6 +28,8 @@ export default function ChatModal({ open, onClose, initialChatId }) {
   const bottomRef = useRef(null)
   const activeChatRef = useRef(null)
   const scanLockRef = useRef(false)
+  const qrCodeScannerRef = useRef(null)
+  const qrCodeReaderRef = useRef(null)
   
 
   const updateChatInState = (updatedChat) => {
@@ -133,6 +135,125 @@ export default function ChatModal({ open, onClose, initialChatId }) {
     setIsQrExpanded(true);
   }, [activeChatId])
 
+  // Calculate activeChat and related values before useEffect that uses them
+  const activeChat = useMemo(() => chats.find((chat) => chat.id === activeChatId), [chats, activeChatId])
+  const qrConfirmed = useMemo(() => Boolean(activeChat?.qrConfirmed), [activeChat?.qrConfirmed])
+
+  // Define handleConfirmQr before useEffect that uses it
+  const handleConfirmQr = useCallback(async (code) => {
+    if (!token || !activeChatId) return
+    const trimmed = (code || '').trim()
+    if (!trimmed) {
+      setQrError('กรุณากรอกรหัสแลกเปลี่ยน')
+      return
+    }
+    setQrError('')
+    scanLockRef.current = true
+    setConfirmingQr(true)
+    try {
+      const updated = await chatApi.confirmQr(token, activeChatId, { code: trimmed })
+      updateChatInState(updated)
+      setQrCodeInput('')
+    } catch (err) {
+      setQrError(err.message || 'ไม่สามารถยืนยันรหัสได้')
+      scanLockRef.current = false
+    } finally {
+      setConfirmingQr(false)
+    }
+  }, [token, activeChatId])
+
+  // Setup and cleanup html5-qrcode scanner
+  useEffect(() => {
+    let isMounted = true
+    let timer = null
+    let scannerInstance = null
+
+    const cleanupScanner = async () => {
+      if (scannerInstance) {
+        try {
+          // Stop scanner first, then clear
+          // html5-qrcode will handle the state check internally
+          await scannerInstance.stop().catch(() => {
+            // Ignore if already stopped or not running
+          })
+          // Clear only after stop is complete
+          scannerInstance.clear()
+        } catch (err) {
+          // Ignore errors during cleanup (scanner might already be stopped)
+          console.debug('Scanner cleanup error:', err)
+        }
+        scannerInstance = null
+      }
+      if (qrCodeScannerRef.current) {
+        qrCodeScannerRef.current = null
+      }
+    }
+
+    if (!open || qrMode !== 'camera') {
+      // Cleanup if scanner is running but conditions are not met
+      cleanupScanner()
+      return () => {
+        isMounted = false
+        if (timer) clearTimeout(timer)
+        cleanupScanner()
+      }
+    }
+
+    // Wait for ref to be available
+    timer = setTimeout(async () => {
+      // Cleanup any existing scanner before starting a new one
+      if (qrCodeScannerRef.current) {
+        await cleanupScanner()
+      }
+      
+      if (!isMounted || !qrCodeReaderRef.current) return
+
+      const qrCodeId = 'qr-reader'
+      const html5QrCode = new Html5Qrcode(qrCodeId)
+      scannerInstance = html5QrCode
+      qrCodeScannerRef.current = html5QrCode
+
+      const startScanning = async () => {
+        if (!isMounted) return
+        try {
+          await html5QrCode.start(
+            { facingMode: 'environment' },
+            {
+              fps: 10,
+              qrbox: { width: 250, height: 250 }
+            },
+            (decodedText) => {
+              if (
+                isMounted &&
+                decodedText &&
+                !confirmingQr &&
+                !qrConfirmed &&
+                !scanLockRef.current
+              ) {
+                handleConfirmQr(decodedText)
+              }
+            },
+            (errorMessage) => {
+              // Ignore errors during scanning (common when no QR code is detected)
+            }
+          )
+        } catch (err) {
+          if (isMounted) {
+            setQrError(err?.message || 'ไม่สามารถเปิดกล้องได้')
+          }
+        }
+      }
+
+      startScanning()
+    }, 100)
+
+    return () => {
+      isMounted = false
+      if (timer) clearTimeout(timer)
+      cleanupScanner()
+    }
+  }, [open, qrMode, confirmingQr, qrConfirmed, handleConfirmQr])
+
   useEffect(() => {
     if (!token || !activeChatId || !open) return
 
@@ -181,28 +302,6 @@ export default function ChatModal({ open, onClose, initialChatId }) {
     }
   }
 
-  const handleConfirmQr = async (code) => {
-    if (!token || !activeChatId) return
-    const trimmed = (code || '').trim()
-    if (!trimmed) {
-      setQrError('กรุณากรอกรหัสแลกเปลี่ยน')
-      return
-    }
-    setQrError('')
-    scanLockRef.current = true
-    setConfirmingQr(true)
-    try {
-      const updated = await chatApi.confirmQr(token, activeChatId, { code: trimmed })
-      updateChatInState(updated)
-      setQrCodeInput('')
-    } catch (err) {
-      setQrError(err.message || 'ไม่สามารถยืนยันรหัสได้')
-      scanLockRef.current = false
-    } finally {
-      setConfirmingQr(false)
-    }
-  }
-
   const handleStartChat = async () => {
     if (!recipientEmail || !token) return
     if (!recipientEmail.endsWith('@cmu.ac.th')) {
@@ -217,7 +316,6 @@ export default function ChatModal({ open, onClose, initialChatId }) {
     setActiveChatId(chat.id)
   }
 
-  const activeChat = useMemo(() => chats.find((chat) => chat.id === activeChatId), [chats, activeChatId])
   const chatStatus = activeChat?.status
   const isExchangeChat = activeChat?.isExchangeChat
   const isOwner = activeChat?.role === 'owner'
@@ -229,7 +327,6 @@ export default function ChatModal({ open, onClose, initialChatId }) {
   const chatDeclined = chatStatus === 'declined'
   // --- START: โค้ดที่แก้ไข ---
   const qrCodeExists = Boolean(activeChat?.qrCode) // 1. สร้างตัวแปรใหม่เช็คว่า QR มีหรือยัง
-  const qrConfirmed = Boolean(activeChat?.qrConfirmed)
 
   // 2. แสดงปุ่ม "ยอมรับ/ปฏิเสธ" ถ้าแชทไม่ถูกปฏิเสธ และ QR Code "ยังไม่ถูกสร้าง"
   const showChatActions = isExchangeChat && !chatDeclined && !qrCodeExists
@@ -513,32 +610,16 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                                     {/* (เราลบ "✅ ยืนยัน..." ออกจากตรงนี้) */}
                                     {qrMode === 'camera' ? (
                                       <div className="mt-4 overflow-hidden rounded-[28px] border border-gray-900/10 bg-black">
-                                        <QrScanner
-                                          onDecode={(result) => {
-                                            if (
-                                              result &&
-                                              !confirmingQr &&
-                                              !qrConfirmed &&
-                                              !scanLockRef.current
-                                            ) {
-                                              handleConfirmQr(
-                                                typeof result === 'string'
-                                                  ? result
-                                                  : Array.isArray(result)
-                                                  ? result[0]
-                                                  : ''
-                                              )
-                                            }
-                                          }}
-                                          onError={(error) => {
-                                            if (error) {
-                                              setQrError(error?.message || 'ไม่สามารถเปิดกล้องได้')
-                                            }
-                                          }}
-                                          constraints={{ facingMode: 'environment' }}
-                                          containerStyle={{ width: '100%', padding: 0 }}
-                                          videoStyle={{ width: '100%' }}
+                                        <div 
+                                          id="qr-reader" 
+                                          ref={qrCodeReaderRef}
+                                          className="w-full"
                                         />
+                                        {qrError && (
+                                          <div className="bg-red-900/70 px-4 py-2 text-center text-xs text-red-200">
+                                            {qrError}
+                                          </div>
+                                        )}
                                         <div className="bg-black/70 px-4 py-3 text-center text-xs text-white">
                                           กรุณาอนุญาตการใช้งานกล้อง และวาง QR Code ให้อยู่ในกรอบ
                                         </div>
@@ -673,7 +754,3 @@ export default function ChatModal({ open, onClose, initialChatId }) {
     </Modal>
   )
 }
-
-
-
-
