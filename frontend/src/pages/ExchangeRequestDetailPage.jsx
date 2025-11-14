@@ -31,8 +31,10 @@ export default function ExchangeRequestDetailPage() {
 
       try {
         setLoading(true)
-        const data = await exchangeApi.getById(token, requestId)
-        setExchangeRequest(data)
+      const data = await exchangeApi.getById(token, requestId)
+      console.log('Exchange request data:', data)
+      console.log('Item image URL:', data.item_image_url)
+      setExchangeRequest(data)
         setError(null)
       } catch (err) {
         console.error('Failed to fetch exchange request:', err)
@@ -50,19 +52,54 @@ export default function ExchangeRequestDetailPage() {
 
     try {
       setProcessing(true)
-      if (exchangeRequest.user_role === 'owner') {
-        await exchangeApi.acceptByOwner(token, requestId)
+      
+      // ตรวจสอบว่า user เป็น owner หรือ requester โดยดูจากข้อมูลที่ได้มา
+      const isOwner = exchangeRequest.user_role === 'owner'
+      
+      let response
+      if (isOwner) {
+        response = await exchangeApi.acceptByOwner(token, requestId)
       } else {
-        await exchangeApi.acceptByRequester(token, requestId)
+        // ตรวจสอบว่า owner accept แล้วหรือยังก่อนที่จะให้ requester accept
+        if (!exchangeRequest.owner_accepted) {
+          alert('กรุณารอให้เจ้าของโพสต์ยอมรับคำขอแลกเปลี่ยนก่อน')
+          setProcessing(false)
+          return
+        }
+        response = await exchangeApi.acceptByRequester(token, requestId)
       }
       
-      // Refresh data
-      const data = await exchangeApi.getById(token, requestId)
-      setExchangeRequest(data)
-      alert('ยอมรับคำขอแลกเปลี่ยนสำเร็จ')
+      // ใช้ข้อมูลจาก response โดยตรง (ถ้ามี) หรือ refresh ใหม่
+      let updatedData = response
+      if (!updatedData) {
+        // Refresh data
+        updatedData = await exchangeApi.getById(token, requestId)
+      }
+      
+      // อัปเดต state
+      setExchangeRequest(updatedData)
+      
+      // ตรวจสอบว่าทั้งสองฝ่ายยอมรับแล้วหรือไม่ (status เป็น 'chatting')
+      if (updatedData.status === 'chatting' || (updatedData.owner_accepted && updatedData.requester_accepted)) {
+        // ไม่ต้องแสดง alert เพราะจะแสดงปุ่มเริ่มแชทแทน
+        // UI จะอัปเดตอัตโนมัติเมื่อ state เปลี่ยน
+      } else {
+        alert('ยอมรับคำขอแลกเปลี่ยนสำเร็จ')
+      }
     } catch (err) {
       console.error('Failed to accept exchange:', err)
-      alert('ยอมรับคำขอแลกเปลี่ยนไม่สำเร็จ: ' + (err.message || 'Unknown error'))
+      // ถ้า error แต่ status อาจอัปเดตแล้ว ให้ refresh ข้อมูลอีกครั้ง
+      try {
+        const data = await exchangeApi.getById(token, requestId)
+        if (data.status === 'chatting' || (data.owner_accepted && data.requester_accepted)) {
+          setExchangeRequest(data)
+          // ไม่แสดง error เพราะอาจสำเร็จแล้ว
+        } else {
+          alert('ยอมรับคำขอแลกเปลี่ยนไม่สำเร็จ: ' + (err.message || 'Unknown error'))
+        }
+      } catch (refreshErr) {
+        alert('ยอมรับคำขอแลกเปลี่ยนไม่สำเร็จ: ' + (err.message || 'Unknown error'))
+      }
     } finally {
       setProcessing(false)
     }
@@ -253,23 +290,36 @@ export default function ExchangeRequestDetailPage() {
               {exchangeRequest.item_image_url ? (
                 <img
                   src={exchangeRequest.item_image_url}
-                  alt={exchangeRequest.item_title}
+                  alt={exchangeRequest.item_title || 'Item image'}
                   className="h-full w-full object-cover"
+                  onError={(e) => {
+                    console.error('Failed to load image:', exchangeRequest.item_image_url)
+                    // ถ้ารูปไม่โหลด ให้ใช้ placeholder
+                    e.target.src = 'https://images.unsplash.com/photo-1503602642458-232111445657?auto=format&fit=crop&w=800&q=80'
+                  }}
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center text-gray-400">
-                  <User size={48} />
+                <div className="flex h-full w-full items-center justify-center bg-gray-100">
+                  <img
+                    src="https://images.unsplash.com/photo-1503602642458-232111445657?auto=format&fit=crop&w=800&q=80"
+                    alt="Placeholder"
+                    className="h-full w-full object-cover opacity-50"
+                  />
                 </div>
               )}
             </div>
-            <h3 className="mb-2 font-semibold text-gray-900">{exchangeRequest.item_title}</h3>
+            <h3 className="mb-2 font-semibold text-gray-900">{exchangeRequest.item_title || 'ไม่มีชื่อสินค้า'}</h3>
             <div className="flex flex-wrap gap-2">
-              <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-gray-700">
-                {exchangeRequest.item_category}
-              </span>
-              <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-gray-700">
-                {exchangeRequest.item_condition}
-              </span>
+              {exchangeRequest.item_category && (
+                <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                  {exchangeRequest.item_category}
+                </span>
+              )}
+              {exchangeRequest.item_condition && (
+                <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                  {exchangeRequest.item_condition}
+                </span>
+              )}
             </div>
           </div>
 

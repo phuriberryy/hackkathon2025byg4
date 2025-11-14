@@ -62,7 +62,8 @@ export default function NotificationsModal({ open, onClose, onUnreadChange }) {
 
     if (chatId) {
       onClose()
-      navigate(`/chat/${chatId}`)
+      // ส่ง custom event เพื่อเปิด ChatModal พร้อม chatId
+      window.dispatchEvent(new CustomEvent('openChat', { detail: { chatId } }))
     }
   }
 
@@ -79,7 +80,12 @@ export default function NotificationsModal({ open, onClose, onUnreadChange }) {
     return `${days} วันที่แล้ว`
   }
 
-  const getNotificationIcon = (type) => {
+  const getNotificationIcon = (type, title) => {
+    // ตรวจสอบว่าเป็นข้อความใหม่หรือไม่
+    if (title === 'ข้อความใหม่' || type === 'message' || type === 'chat_message') {
+      return <MessageCircle size={20} className="text-primary" />
+    }
+    
     switch (type) {
       case 'exchange_request':
         return <RefreshCw size={20} className="text-blue-500" />
@@ -113,7 +119,9 @@ export default function NotificationsModal({ open, onClose, onUnreadChange }) {
             notifications.map((notification) => {
               const isExchangeRequest = notification.type === 'exchange_request' || notification.type === 'exchange_accepted'
               const isCompleted = notification.type === 'exchange_completed'
+              const isMessage = notification.title === 'ข้อความใหม่' || notification.type === 'message' || notification.type === 'chat_message'
               const metadata = notification.metadata || {}
+              const chatId = metadata.chatId || metadata.chat_id
 
               return (
                 <div
@@ -124,15 +132,17 @@ export default function NotificationsModal({ open, onClose, onUnreadChange }) {
                   onClick={() => {
                     if (isExchangeRequest || isCompleted) {
                       handleViewExchangeRequest(notification)
+                    } else if (isMessage && chatId) {
+                      handleOpenChat(notification)
                     }
                   }}
-                  style={{ cursor: isExchangeRequest || isCompleted ? 'pointer' : 'default' }}
+                  style={{ cursor: (isExchangeRequest || isCompleted || (isMessage && chatId)) ? 'pointer' : 'default' }}
                 >
                   <div className="flex items-start gap-4">
                     <div className={`flex h-12 w-12 items-center justify-center rounded-full ${
                       !notification.read ? 'bg-primary/10' : 'bg-gray-100'
                     }`}>
-                      {getNotificationIcon(notification.type)}
+                      {getNotificationIcon(notification.type, notification.title)}
                     </div>
                     <div className="flex-1">
                       <div className="flex items-start justify-between">
@@ -153,6 +163,12 @@ export default function NotificationsModal({ open, onClose, onUnreadChange }) {
                       {(isExchangeRequest || isCompleted) && (
                         <div className="mt-3 flex items-center gap-2 text-sm text-primary">
                           <span>ดูรายละเอียด</span>
+                          <ArrowRight size={16} />
+                        </div>
+                      )}
+                      {isMessage && chatId && (
+                        <div className="mt-3 flex items-center gap-2 text-sm text-primary">
+                          <span>เปิดแชท</span>
                           <ArrowRight size={16} />
                         </div>
                       )}

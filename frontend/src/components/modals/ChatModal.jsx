@@ -7,7 +7,7 @@ import { useAuth } from '../../context/AuthContext'
 
 const SOCKET_URL = API_BASE.replace(/\/api$/, '')
 
-export default function ChatModal({ open, onClose }) {
+export default function ChatModal({ open, onClose, initialChatId }) {
   const { token, user } = useAuth()
   const [chats, setChats] = useState([])
   const [messages, setMessages] = useState([])
@@ -28,10 +28,15 @@ export default function ChatModal({ open, onClose }) {
       .list(token)
       .then((data) => {
         setChats(data)
-        setActiveChatId((current) => current ?? data[0]?.id ?? null)
+        // ใช้ initialChatId ถ้ามี หรือใช้ chat แรกในรายการ
+        if (initialChatId && data.find((c) => c.id === initialChatId)) {
+          setActiveChatId(initialChatId)
+        } else {
+          setActiveChatId((current) => current ?? data[0]?.id ?? null)
+        }
       })
       .finally(() => setLoading(false))
-  }, [open, token])
+  }, [open, token, initialChatId])
 
   const refreshChats = async () => {
     if (!token) return

@@ -25,6 +25,7 @@ function AppContent() {
   const [exchangeRequestOpen, setExchangeRequestOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
+  const [selectedChatId, setSelectedChatId] = useState(null)
   const [selectedItem, setSelectedItem] = useState(null)
   const [unreadCount, setUnreadCount] = useState(0)
   const [itemsVersion, setItemsVersion] = useState(0)
@@ -78,6 +79,22 @@ function AppContent() {
       socket.disconnect()
     }
   }, [token])
+
+  // Listen for openChat custom event
+  useEffect(() => {
+    const handleOpenChat = (event) => {
+      const { chatId } = event.detail || {}
+      if (chatId) {
+        setSelectedChatId(chatId)
+        setChatOpen(true)
+      }
+    }
+
+    window.addEventListener('openChat', handleOpenChat)
+    return () => {
+      window.removeEventListener('openChat', handleOpenChat)
+    }
+  }, [])
 
   if (loading) {
     return (
@@ -162,7 +179,11 @@ function AppContent() {
       />
       <ChatModal
         open={chatOpen}
-        onClose={() => setChatOpen(false)}
+        onClose={() => {
+          setChatOpen(false)
+          setSelectedChatId(null)
+        }}
+        initialChatId={selectedChatId}
       />
     </div>
   )

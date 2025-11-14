@@ -161,7 +161,7 @@ export const getExchangeRequest = async (req, res) => {
         requester.faculty as requester_faculty,
         requester.avatar_url as requester_avatar_url,
         CASE 
-          WHEN i.user_id = $1 THEN 'owner'
+          WHEN i.user_id = $2 THEN 'owner'
           ELSE 'requester'
         END as user_role
        FROM exchange_requests er
@@ -169,7 +169,7 @@ export const getExchangeRequest = async (req, res) => {
        JOIN users owner ON i.user_id = owner.id
        JOIN users requester ON er.requester_id = requester.id
        WHERE er.id = $1`,
-      [requestId]
+      [requestId, req.user.id]
     )
 
     if (!result.rowCount) {
@@ -225,7 +225,16 @@ export const acceptExchangeRequestByOwner = async (req, res) => {
 
     // ตรวจสอบว่า user เป็นเจ้าของ item หรือไม่
     if (exchangeRequest.owner_id !== req.user.id) {
+      // ตรวจสอบว่า user เป็น requester หรือไม่ เพื่อให้ error message ชัดเจนขึ้น
+      if (exchangeRequest.requester_id === req.user.id) {
+        return res.status(400).json({ message: 'You are the requester. Please wait for the owner to accept first, then you can accept.' })
+      }
       return res.status(403).json({ message: 'Only the item owner can accept this request' })
+    }
+
+    // ตรวจสอบว่า owner ยังไม่ยอมรับหรือยัง
+    if (exchangeRequest.owner_accepted) {
+      return res.status(400).json({ message: 'You have already accepted this exchange request' })
     }
 
     // อัปเดต owner_accepted
@@ -431,18 +440,66 @@ export const acceptExchangeRequestByRequester = async (req, res) => {
 
     const exchangeRequest = exchangeResult.rows[0]
 
+    // Debug log
+    console.log('Accept by requester - Exchange request:', {
+      id: exchangeRequest.id,
+      requester_id: exchangeRequest.requester_id,
+      user_id: req.user.id,
+      owner_accepted: exchangeRequest.owner_accepted,
+      requester_accepted: exchangeRequest.requester_accepted,
+      status: exchangeRequest.status
+    })
+
     // ตรวจสอบว่า user เป็น requester หรือไม่
     if (exchangeRequest.requester_id !== req.user.id) {
+      // ตรวจสอบว่า user เป็น owner หรือไม่ เพื่อให้ error message ชัดเจนขึ้น
+      if (exchangeRequest.owner_id === req.user.id) {
+        return res.status(400).json({ message: 'You are the owner. Please use the owner accept endpoint instead.' })
+      }
       return res.status(403).json({ message: 'Only the requester can accept this request' })
     }
 
+    // ตรวจสอบ status - ถ้า status ไม่ใช่ pending หรือ chatting ก็ไม่สามารถ accept ได้
+    if (exchangeRequest.status !== 'pending' && exchangeRequest.status !== 'chatting') {
+      return res.status(400).json({ 
+        message: `Cannot accept exchange request. Current status: ${exchangeRequest.status}` 
+      })
+    }
+
+    // ตรวจสอบว่า owner accept แล้วหรือยัง
+    if (!exchangeRequest.owner_accepted) {
+      return res.status(400).json({ message: 'Owner has not accepted the request yet' })
+    }
+
+    // ตรวจสอบว่า requester ยังไม่ยอมรับหรือยัง (ต้องตรวจสอบเป็น boolean อย่างชัดเจน)
+    // ตรวจสอบทั้ง true และ 'true' (string) เพื่อความปลอดภัย
+    if (exchangeRequest.requester_accepted === true || exchangeRequest.requester_accepted === 'true') {
+      console.log('Requester has already accepted:', exchangeRequest.requester_accepted)
+      return res.status(400).json({ message: 'You have already accepted this exchange request' })
+    }
+
     // อัปเดต requester_accepted
-    await query(
+    const updateResult = await query(
       `UPDATE exchange_requests 
        SET requester_accepted=TRUE, updated_at=NOW()
-       WHERE id=$1`,
+       WHERE id=$1 AND requester_accepted=FALSE
+       RETURNING *`,
       [requestId]
     )
+
+    // ตรวจสอบว่าอัปเดตสำเร็จหรือไม่
+    if (updateResult.rowCount === 0) {
+      console.log('Failed to update requester_accepted - may already be accepted')
+      // ดึงข้อมูลใหม่เพื่อตรวจสอบ
+      const checkResult = await query(
+        'SELECT requester_accepted FROM exchange_requests WHERE id=$1',
+        [requestId]
+      )
+      if (checkResult.rowCount > 0 && checkResult.rows[0].requester_accepted === true) {
+        return res.status(400).json({ message: 'You have already accepted this exchange request' })
+      }
+      return res.status(400).json({ message: 'Failed to accept exchange request. Please try again.' })
+    }
 
     // ตรวจสอบว่าทั้งสองฝ่ายยอมรับแล้วหรือไม่
     const updatedRequest = await query(
@@ -452,12 +509,32 @@ export const acceptExchangeRequestByRequester = async (req, res) => {
 
     const updated = updatedRequest.rows[0]
 
+    console.log('After requester accept - Exchange request:', {
+      id: updated.id,
+      owner_accepted: updated.owner_accepted,
+      requester_accepted: updated.requester_accepted,
+      status: updated.status
+    })
+
     if (updated.owner_accepted && updated.requester_accepted) {
       // ทั้งสองฝ่ายยอมรับแล้ว - สร้าง exchange history และ chat
-      await completeExchange(requestId, exchangeRequest)
+      console.log('Both parties accepted - calling completeExchange')
+      try {
+        await completeExchange(requestId, exchangeRequest)
+        console.log('completeExchange successful')
+      } catch (completeErr) {
+        console.error('Error in completeExchange:', completeErr)
+        // ไม่ throw error เพื่อไม่ให้การ accept ล้มเหลว
+        // แต่จะ log error เพื่อ debug
+      }
+    } else {
+      console.log('Not both parties accepted yet:', {
+        owner_accepted: updated.owner_accepted,
+        requester_accepted: updated.requester_accepted
+      })
     }
 
-    // ดึงข้อมูล exchange request ที่อัปเดตแล้ว
+    // ดึงข้อมูล exchange request ที่อัปเดตแล้ว (ต้องดึงใหม่เพื่อให้ได้ status ที่อัปเดตแล้ว)
     const finalResult = await query(
       `SELECT 
         er.*,
@@ -640,6 +717,14 @@ async function completeExchange(requestId, exchangeRequest) {
        SET status='chatting', updated_at=NOW()
        WHERE id=$1`,
       [requestId]
+    )
+
+    // อัปเดต item status เป็น in_progress เพื่อแสดง "กำลังดำเนินการ" ในหน้า HomePage
+    await query(
+      `UPDATE items 
+       SET status='in_progress', updated_at=NOW()
+       WHERE id=$1`,
+      [exchangeRequest.item_id]
     )
 
     // ตรวจสอบว่ามี chat อยู่แล้วหรือไม่
