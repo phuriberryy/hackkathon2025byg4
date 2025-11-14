@@ -261,10 +261,16 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
                     return null
                   })()}
                 </div>
-                {/* Badge ขวาบน: Exchange */}
-                <span className="absolute right-4 top-4 rounded-full bg-primary px-3 py-1.5 text-sm font-semibold text-white">
-                  Exchange
-                </span>
+                {/* Badge ขวาบน: Exchange หรือ กำลังดำเนินการ */}
+                {item.status === 'in_progress' ? (
+                  <span className="absolute right-4 top-4 rounded-full bg-yellow-500 px-3 py-1.5 text-sm font-semibold text-white">
+                    กำลังดำเนินการ
+                  </span>
+                ) : (
+                  <span className="absolute right-4 top-4 rounded-full bg-primary px-3 py-1.5 text-sm font-semibold text-white">
+                    Exchange
+                  </span>
+                )}
               </div>
               <div className="flex flex-1 flex-col space-y-4 p-5">
                 {/* Category Badge */}

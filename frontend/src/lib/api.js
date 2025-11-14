@@ -100,6 +100,21 @@ export const exchangeApi = {
       method: 'POST',
       token,
     }),
+  acceptInChat: (token, chatId) =>
+    request(`/exchange/chat/${chatId}/accept`, {
+      method: 'POST',
+      token,
+    }),
+  rejectInChat: (token, chatId) =>
+    request(`/exchange/chat/${chatId}/reject`, {
+      method: 'POST',
+      token,
+    }),
+  finalize: (token, chatId) =>
+    request(`/exchange/chat/${chatId}/finalize`, {
+      method: 'POST',
+      token,
+    }),
 }
 
 export const notificationApi = {

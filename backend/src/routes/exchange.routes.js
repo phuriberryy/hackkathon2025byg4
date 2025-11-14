@@ -8,6 +8,9 @@ import {
   acceptExchangeRequestByRequester,
   rejectExchangeRequest,
   getMyExchangeRequests,
+  acceptInChat,
+  rejectInChat,
+  finalizeExchange,
 } from '../controllers/exchangeController.js'
 
 const router = Router()
@@ -54,6 +57,27 @@ router.post(
   '/:requestId/reject',
   [param('requestId').isUUID()],
   rejectExchangeRequest
+)
+
+// ยอมรับการแลกเปลี่ยนในแชท
+router.post(
+  '/chat/:chatId/accept',
+  [param('chatId').isUUID()],
+  acceptInChat
+)
+
+// ปฏิเสธการแลกเปลี่ยนในแชท
+router.post(
+  '/chat/:chatId/reject',
+  [param('chatId').isUUID()],
+  rejectInChat
+)
+
+// สแกน QR code ปิดงาน (finalize exchange)
+router.post(
+  '/chat/:chatId/finalize',
+  [param('chatId').isUUID()],
+  finalizeExchange
 )
 
 export default router

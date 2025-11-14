@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
-import { Send, MessageCircle, Loader2 } from 'lucide-react'
+import { Send, MessageCircle, Loader2, Check, X, QrCode } from 'lucide-react'
 import Modal from '../ui/Modal'
-import { API_BASE, chatApi } from '../../lib/api'
+import { API_BASE, chatApi, exchangeApi } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 
 const SOCKET_URL = API_BASE.replace(/\/api$/, '')
@@ -15,6 +15,7 @@ export default function ChatModal({ open, onClose }) {
   const [newMessage, setNewMessage] = useState('')
   const [recipientEmail, setRecipientEmail] = useState('')
   const [loading, setLoading] = useState(false)
+  const [actionLoading, setActionLoading] = useState(false)
   const socketRef = useRef(null)
   const bottomRef = useRef(null)
   const activeChatRef = useRef(null)
@@ -31,6 +32,56 @@ export default function ChatModal({ open, onClose }) {
       })
       .finally(() => setLoading(false))
   }, [open, token])
+
+  const refreshChats = async () => {
+    if (!token) return
+    const data = await chatApi.list(token)
+    setChats(data)
+  }
+
+  const handleAcceptInChat = async () => {
+    if (!activeChatId || !token || actionLoading) return
+    setActionLoading(true)
+    try {
+      await exchangeApi.acceptInChat(token, activeChatId)
+      alert('ยอมรับการแลกเปลี่ยนแล้ว')
+      await refreshChats()
+    } catch (err) {
+      alert(err.message || 'เกิดข้อผิดพลาด')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleRejectInChat = async () => {
+    if (!activeChatId || !token || actionLoading) return
+    if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการปฏิเสธการแลกเปลี่ยนนี้?')) return
+    setActionLoading(true)
+    try {
+      await exchangeApi.rejectInChat(token, activeChatId)
+      alert('ปฏิเสธการแลกเปลี่ยนแล้ว')
+      await refreshChats()
+    } catch (err) {
+      alert(err.message || 'เกิดข้อผิดพลาด')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleFinalizeExchange = async () => {
+    if (!activeChatId || !token || actionLoading) return
+    if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการปิดงานการแลกเปลี่ยนนี้? (สแกน QR code)')) return
+    setActionLoading(true)
+    try {
+      const result = await exchangeApi.finalize(token, activeChatId)
+      alert(`ปิดงานสำเร็จ! CO₂ ที่ลดได้: ${result.co2Reduced} kg`)
+      await refreshChats()
+    } catch (err) {
+      alert(err.message || 'เกิดข้อผิดพลาด')
+    } finally {
+      setActionLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (!token || !open) return
@@ -92,6 +143,8 @@ export default function ChatModal({ open, onClose }) {
   }
 
   const activeChat = useMemo(() => chats.find((chat) => chat.id === activeChatId), [chats, activeChatId])
+  const isExchangeChat = activeChat?.exchange_request_id != null
+  const exchangeStatus = activeChat?.exchange_request_status
 
   return (
     <Modal open={open} onClose={onClose} title="Messages" size="xl">
@@ -149,12 +202,56 @@ export default function ChatModal({ open, onClose }) {
           <div className="flex-1 rounded-3xl bg-white p-4 shadow-inner">
             {activeChat ? (
               <div className="flex h-[420px] flex-col">
-                <div className="mb-3 flex items-center gap-2 border-b border-gray-100 pb-2">
-                  <MessageCircle size={18} className="text-primary" />
-                  <div>
-                    <p className="text-sm font-semibold">{activeChat.participant_name}</p>
-                    <p className="text-xs text-gray-500">{activeChat.participant_email}</p>
+                <div className="mb-3 flex items-center justify-between border-b border-gray-100 pb-2">
+                  <div className="flex items-center gap-2">
+                    <MessageCircle size={18} className="text-primary" />
+                    <div>
+                      <p className="text-sm font-semibold">{activeChat.participant_name}</p>
+                      <p className="text-xs text-gray-500">{activeChat.participant_email}</p>
+                    </div>
                   </div>
+                  {isExchangeChat && (
+                    <div className="flex gap-2">
+                      {exchangeStatus === 'chatting' && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={handleAcceptInChat}
+                            disabled={actionLoading}
+                            className="flex items-center gap-1 rounded-lg bg-green-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-600 disabled:opacity-50"
+                          >
+                            <Check size={14} />
+                            ยอมรับ
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleRejectInChat}
+                            disabled={actionLoading}
+                            className="flex items-center gap-1 rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600 disabled:opacity-50"
+                          >
+                            <X size={14} />
+                            ปฏิเสธ
+                          </button>
+                        </>
+                      )}
+                      {exchangeStatus === 'in_progress' && (
+                        <button
+                          type="button"
+                          onClick={handleFinalizeExchange}
+                          disabled={actionLoading}
+                          className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary/90 disabled:opacity-50"
+                        >
+                          <QrCode size={14} />
+                          สแกน QR ปิดงาน
+                        </button>
+                      )}
+                      {exchangeStatus === 'completed' && (
+                        <span className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-600">
+                          สำเร็จแล้ว
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="flex-1 space-y-2 overflow-y-auto pr-1">
                   {messages.map((msg) => (
