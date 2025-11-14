@@ -8,6 +8,7 @@ import {
   updateItem,
   deleteItem,
   getUserItems,
+  getItemExchangeRequests,
 } from '../controllers/itemController.js'
 
 const router = Router()
@@ -63,6 +64,13 @@ router.get(
   authenticate,
   [param('userId').isUUID()],
   getUserItems
+)
+
+router.get(
+  '/:itemId/exchange-requests',
+  authenticate,
+  [param('itemId').isUUID()],
+  getItemExchangeRequests
 )
 
 export default router

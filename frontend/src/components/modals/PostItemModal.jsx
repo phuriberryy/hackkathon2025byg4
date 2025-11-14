@@ -40,10 +40,6 @@ export default function PostItemModal({ open, onClose, onSuccess }) {
       alert('กรุณาเข้าสู่ระบบก่อนโพสต์ของแลกเปลี่ยน')
       return
     }
-    if (!imagePreview) {
-      alert('กรุณาอัปโหลดรูปภาพของสินค้าก่อนโพสต์')
-      return
-    }
     setSubmitting(true)
     try {
       await itemsApi.create(token, {
@@ -108,15 +104,14 @@ export default function PostItemModal({ open, onClose, onSuccess }) {
           </label>
           <input
             type="file"
-            name="itemImage"
             accept="image/*"
             onChange={handleImageChange}
             className="hidden"
-            id="post-item-image-upload"
-            aria-required="true"
+            id="image-upload"
+            required
           />
           <label
-            htmlFor="post-item-image-upload"
+            htmlFor="image-upload"
             className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 p-12 text-center transition hover:border-primary hover:bg-primary/5"
           >
             {imagePreview ? (
@@ -288,6 +283,7 @@ export default function PostItemModal({ open, onClose, onSuccess }) {
     </Modal>
   )
 }
+
 
 
 

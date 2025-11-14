@@ -11,8 +11,10 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@yudiel/react-qr-scanner": "^2.4.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.553.0",
+    "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.9.5",

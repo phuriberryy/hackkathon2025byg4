@@ -95,6 +95,24 @@ export const verifyEmailConnection = async () => {
   }
 }
 
+// แปลง HTML เป็น plain text
+const htmlToText = (html) => {
+  return html
+    .replace(/<style[^>]*>.*?<\/style>/gis, '')
+    .replace(/<script[^>]*>.*?<\/script>/gis, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+// สร้าง Message-ID ที่ถูกต้อง
+const generateMessageId = () => {
+  const domain = env.emailUser?.split('@')[1] || 'cmusharecycle.local'
+  const timestamp = Date.now()
+  const random = Math.random().toString(36).substring(2, 15)
+  return `<${timestamp}.${random}@${domain}>`
+}
+
 // ส่งอีเมล
 export const sendEmail = async ({ to, subject, html }) => {
   // ใช้ mock mode ถ้าไม่มี email config
@@ -113,13 +131,36 @@ export const sendEmail = async ({ to, subject, html }) => {
   }
 
   try {
+    const fromEmail = env.emailFrom.includes('@') 
+      ? env.emailFrom
+      : env.emailUser
+
     const info = await transporter.sendMail({
-      from: env.emailFrom.includes('@') 
-        ? `"CMU ShareCycle" <${env.emailFrom}>`
-        : `"CMU ShareCycle" <${env.emailUser}>`,
+      from: `"CMU ShareCycle" <${fromEmail}>`,
       to,
       subject,
       html,
+      text: htmlToText(html), // เพิ่ม plain text version
+      replyTo: fromEmail, // ตั้งค่า Reply-To
+      // Email headers เพื่อลดการถูกจัดเป็น spam
+      headers: {
+        'Message-ID': generateMessageId(),
+        'X-Priority': '3', // Normal priority (1=highest, 3=normal, 5=lowest)
+        'X-MSMail-Priority': 'Normal',
+        'Importance': 'normal',
+        'X-Mailer': 'CMU ShareCycle Platform',
+        'X-Auto-Response-Suppress': 'All',
+        'List-Unsubscribe': `<mailto:${fromEmail}?subject=unsubscribe>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        'Organization': 'Chiang Mai University',
+        'Return-Path': fromEmail,
+        'X-Entity-Ref-ID': `cmu-sharecycle-${Date.now()}`,
+        'MIME-Version': '1.0',
+        'Content-Type': 'text/html; charset=UTF-8',
+        'Content-Transfer-Encoding': 'quoted-printable',
+      },
+      // ตั้งค่า priority
+      priority: 'normal',
     })
 
     console.log('✅ Email sent successfully:', info.messageId)

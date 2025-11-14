@@ -177,6 +177,69 @@ export const getExchangeHistory = async (req, res) => {
   }
 }
 
+// อัปเดต profile
+export const updateProfile = async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Unauthorized' })
+  }
+
+  const { name, faculty, avatar_url } = req.body
+
+  try {
+    // เตรียมค่าสำหรับ update (อัปเดตเฉพาะฟิลด์ที่ส่งมา)
+    const updateFields = []
+    const updateValues = []
+    let paramIndex = 1
+
+    if (name !== undefined && name !== null) {
+      updateFields.push(`name = $${paramIndex}`)
+      updateValues.push(name)
+      paramIndex++
+    }
+
+    if (faculty !== undefined && faculty !== null) {
+      updateFields.push(`faculty = $${paramIndex}`)
+      updateValues.push(faculty)
+      paramIndex++
+    }
+
+    if (avatar_url !== undefined && avatar_url !== null) {
+      updateFields.push(`avatar_url = $${paramIndex}`)
+      updateValues.push(avatar_url)
+      paramIndex++
+    }
+
+    if (updateFields.length === 0) {
+      return res.status(400).json({ message: 'No fields to update' })
+    }
+
+    // เพิ่ม updated_at
+    updateFields.push(`updated_at = NOW()`)
+    
+    // เพิ่ม user id เป็น parameter สุดท้าย
+    updateValues.push(req.user.id)
+    const userIdParamIndex = paramIndex
+
+    const result = await query(
+      `UPDATE users 
+       SET ${updateFields.join(', ')}
+       WHERE id = $${userIdParamIndex}
+       RETURNING id, name, faculty, email, avatar_url, created_at`,
+      updateValues
+    )
+
+    if (!result.rowCount) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+
+    return res.json(result.rows[0])
+  } catch (err) {
+    console.error('Update profile error:', err)
+    return res.status(500).json({ message: 'Internal server error' })
+  }
+}
+
+
 
 
 

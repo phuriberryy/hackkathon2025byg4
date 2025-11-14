@@ -1,7 +1,14 @@
 import { Router } from 'express'
 import { body, param } from 'express-validator'
 import { authenticate } from '../middleware/auth.js'
-import { createChat, getChatMessages, getChats } from '../controllers/chatController.js'
+import {
+  createChat,
+  getChatMessages,
+  getChats,
+  acceptChat,
+  declineChat,
+  confirmChatQr,
+} from '../controllers/chatController.js'
 
 const router = Router()
 
@@ -26,6 +33,14 @@ router.post(
     body('exchangeRequestId').optional().isUUID(),
   ],
   createChat
+)
+
+router.patch('/:chatId/accept', [param('chatId').isUUID()], acceptChat)
+router.patch('/:chatId/decline', [param('chatId').isUUID()], declineChat)
+router.post(
+  '/:chatId/confirm',
+  [param('chatId').isUUID(), body('code').isString().notEmpty()],
+  confirmChatQr
 )
 
 export default router

@@ -64,6 +64,10 @@ export const itemsApi = {
     request(`/items/user/${userId}`, {
       token,
     }),
+  getItemExchangeRequests: (token, itemId) =>
+    request(`/items/${itemId}/exchange-requests`, {
+      token,
+    }),
 }
 
 export const exchangeApi = {
@@ -96,6 +100,21 @@ export const exchangeApi = {
       method: 'POST',
       token,
     }),
+  acceptInChat: (token, chatId) =>
+    request(`/exchange/chat/${chatId}/accept`, {
+      method: 'POST',
+      token,
+    }),
+  rejectInChat: (token, chatId) =>
+    request(`/exchange/chat/${chatId}/reject`, {
+      method: 'POST',
+      token,
+    }),
+  finalize: (token, chatId) =>
+    request(`/exchange/chat/${chatId}/finalize`, {
+      method: 'POST',
+      token,
+    }),
 }
 
 export const notificationApi = {
@@ -108,6 +127,12 @@ export const notificationApi = {
 
 export const profileApi = {
   getProfile: (token) => request('/profile', { token }),
+  updateProfile: (token, payload) =>
+    request('/profile', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+      token,
+    }),
   getMyItems: (token) => request('/profile/items', { token }),
   getExchangeHistory: (token) => request('/profile/exchange-history', { token }),
 }

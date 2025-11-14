@@ -91,7 +91,35 @@ export const createExchangeRequest = async (req, res) => {
       // ไม่ throw error เพื่อไม่ให้การสร้าง exchange request ล้มเหลว
     }
 
-    return res.status(201).json(exchangeRequest)
+    // --- START: โค้ดที่เพิ่มเข้ามา ---
+    // สร้างแชทที่เชื่อมโยงกับ exchange request นี้ทันที
+    const chatResult = await query(
+      `INSERT INTO chats (creator_id, participant_id, item_id, exchange_request_id, status, updated_at)
+       VALUES ($1,$2,$3,$4,'active',NOW())
+       RETURNING id`,
+      [
+        req.user.id, // ผู้สร้างแชท (ผู้ขอแลก)
+        item.user_id, // ผู้เข้าร่วม (เจ้าของ)
+        itemId,
+        exchangeRequest.id
+      ]
+    )
+    const chatId = chatResult.rows[0].id;
+    
+    // ส่ง Socket.io event ไปหาเจ้าของโพสต์ (item.user_id) ว่ามีแชทใหม่
+    const io = getChatServer()
+    if (io) {
+      // เราต้อง fetch chat row ที่สมบูรณ์เพื่อส่งไป
+      // (หมายเหตุ: `fetchChatById` ต้องถูก import มาจาก chatController หรือย้ายไปเป็น helper)
+      // เพื่อความง่าย, เราจะส่งแค่ event 'notification:new' ก่อน
+      io.to(item.user_id).emit('notification:new')
+      // ถ้าคุณมีฟังก์ชัน fetchChatById ที่นี่ คุณสามารถ emit 'chat:created' ได้เลย
+    }
+
+    // แก้ไข response ให้ส่ง chatId กลับไปด้วย
+    return res.status(201).json({ ...exchangeRequest, chatId })
+    // --- END: โค้ดที่เพิ่มเข้ามา ---
+
   } catch (err) {
     console.error('Create exchange request error:', err)
     return res.status(500).json({ message: 'Internal server error' })
@@ -503,7 +531,7 @@ async function completeExchange(requestId, exchangeRequest) {
 
     // ดึงข้อมูล item ของ owner
     const ownerItemResult = await query(
-      `SELECT id, category, item_condition, title FROM items WHERE id=$1`,
+      `SELECT id, category, item_condition, title, image_url FROM items WHERE id=$1`,
       [exchangeRequest.item_id]
     )
 
@@ -537,68 +565,99 @@ async function completeExchange(requestId, exchangeRequest) {
       [exchangeRequest.item_id]
     )
 
-    // สร้าง chat อัตโนมัติ
+   // --- START: โค้ดที่แก้ไข ---
+    // เราจะไม่สร้างแชทใหม่ แต่จะไป "ค้นหา" แชทเดิมที่ถูกสร้างไว้แล้ว
     const chatResult = await query(
-      `INSERT INTO chats (creator_id, participant_id, item_id, exchange_request_id)
-       VALUES ($1,$2,$3,$4)
-       RETURNING *`,
-      [exchangeRequest.owner_id, exchangeRequest.requester_id, exchangeRequest.item_id, requestId]
+      `SELECT id FROM chats WHERE exchange_request_id=$1`,
+      [requestId]
     )
 
-    const chat = chatResult.rows[0]
-    const chatId = chat.id
+    if (!chatResult.rowCount) {
+      // นี่เป็นกรณีฉุกเฉิน ไม่ควรเกิดขึ้น
+      console.error(`Chat not found for completed exchange request ${requestId}`)
+      throw new Error('Associated chat not found')
+    }
+    
+    const chatId = chatResult.rows[0].id
+    // --- END: โค้ดที่แก้ไข ---
+
     const metadata = JSON.stringify({ exchangeRequestId: requestId, chatId, itemId: exchangeRequest.item_id })
+    
 
     const io = getChatServer()
     let ownerUser = null
     let requesterUser = null
 
-    if (io) {
-      const [ownerUserResult, requesterUserResult] = await Promise.all([
-        query('SELECT id, name, email, avatar_url FROM users WHERE id=$1', [exchangeRequest.owner_id]),
-        query('SELECT id, name, email, avatar_url FROM users WHERE id=$1', [exchangeRequest.requester_id]),
-      ])
-      ownerUser = ownerUserResult.rows[0]
-      requesterUser = requesterUserResult.rows[0]
-    }
+    // if (io) {
+    //   const [ownerUserResult, requesterUserResult] = await Promise.all([
+    //     query('SELECT id, name, email, avatar_url FROM users WHERE id=$1', [exchangeRequest.owner_id]),
+    //     query('SELECT id, name, email, avatar_url FROM users WHERE id=$1', [exchangeRequest.requester_id]),
+    //   ])
+    //   ownerUser = ownerUserResult.rows[0]
+    //   requesterUser = requesterUserResult.rows[0]
+    // }
 
-    // สร้าง notifications สำหรับทั้งสองฝ่าย
-    await query(
-      `INSERT INTO notifications (user_id, title, body, type, metadata)
-       VALUES ($1,$2,$3,$4,$5), ($6,$7,$8,$4,$5)`,
-      [
-        exchangeRequest.owner_id,
-        'การแลกเปลี่ยนสำเร็จ',
-        `การแลกเปลี่ยน "${exchangeRequest.item_title}" สำเร็จแล้ว แชทได้เปิดให้แล้ว`,
-        'exchange_completed',
-        metadata,
-        exchangeRequest.requester_id,
-        'การแลกเปลี่ยนสำเร็จ',
-        `การแลกเปลี่ยน "${exchangeRequest.item_title}" สำเร็จแล้ว แชทได้เปิดให้แล้ว`,
-        metadata,
-      ]
-    )
+    // // สร้าง notifications สำหรับทั้งสองฝ่าย
+    // await query(
+    //   `INSERT INTO notifications (user_id, title, body, type, metadata)
+    //    VALUES ($1,$2,$3,$4,$5), ($6,$7,$8,$4,$5)`,
+    //   [
+    //     exchangeRequest.owner_id,
+    //     'การแลกเปลี่ยนสำเร็จ',
+    //     `การแลกเปลี่ยน "${exchangeRequest.item_title}" สำเร็จแล้ว แชทได้เปิดให้แล้ว`,
+    //     'exchange_completed',
+    //     metadata,
+    //     exchangeRequest.requester_id,
+    //     'การแลกเปลี่ยนสำเร็จ',
+    //     `การแลกเปลี่ยน "${exchangeRequest.item_title}" สำเร็จแล้ว แชทได้เปิดให้แล้ว`,
+    //     metadata,
+    //   ]
+    // )
 
-    if (io) {
-      const chatForOwner = {
-        ...chat,
-        participant_name: requesterUser?.name || 'CMU Student',
-        participant_email: requesterUser?.email || '',
-        participant_avatar_url: requesterUser?.avatar_url || null,
-      }
+    // // if (io) {
+    // //   const baseChat = {
+    // //     id: chat.id,
+    // //     creator_id: chat.creator_id,
+    // //     participant_id: chat.participant_id,
+    // //     item_id: chat.item_id,
+    // //     exchange_request_id: chat.exchange_request_id,
+    // //     created_at: chat.created_at,
+    // //     updated_at: chat.updated_at,
+    // //     status: chat.status,
+    // //     ownerAccepted: chat.owner_accepted,
+    // //     requesterAccepted: chat.requester_accepted,
+    // //     qrCode: chat.qr_code,
+    // //     qrConfirmed: chat.qr_confirmed,
+    // //     qrConfirmedAt: chat.qr_confirmed_at,
+    // //     closedAt: chat.closed_at,
+    // //     isExchangeChat: true,
+    // //     itemTitle: ownerItem.title,
+    // //     itemImageUrl: ownerItem.image_url,
+    // //     exchangeStatus: 'accepted',
+    // //     canSendMessages: false,
+    // //   }
 
-      const chatForRequester = {
-        ...chat,
-        participant_name: ownerUser?.name || 'CMU Student',
-        participant_email: ownerUser?.email || '',
-        participant_avatar_url: ownerUser?.avatar_url || null,
-      }
+    // //   const chatForOwner = {
+    // //     ...baseChat,
+    // //     participant_name: requesterUser?.name || 'CMU Student',
+    // //     participant_email: requesterUser?.email || '',
+    // //     participant_avatar_url: requesterUser?.avatar_url || null,
+    // //     role: 'owner',
+    // //   }
 
-      io.to(exchangeRequest.owner_id).emit('chat:created', chatForOwner)
-      io.to(exchangeRequest.requester_id).emit('chat:created', chatForRequester)
-      io.to(exchangeRequest.owner_id).emit('notification:new')
-      io.to(exchangeRequest.requester_id).emit('notification:new')
-    }
+    // //   const chatForRequester = {
+    // //     ...baseChat,
+    // //     participant_name: ownerUser?.name || 'CMU Student',
+    // //     participant_email: ownerUser?.email || '',
+    // //     participant_avatar_url: ownerUser?.avatar_url || null,
+    // //     role: 'requester',
+    // //   }
+
+    // //   io.to(exchangeRequest.owner_id).emit('chat:created', chatForOwner)
+    // //   io.to(exchangeRequest.requester_id).emit('chat:created', chatForRequester)
+    // //   io.to(exchangeRequest.owner_id).emit('notification:new')
+    // //   io.to(exchangeRequest.requester_id).emit('notification:new')
+    // // }
 
     // ส่งอีเมลไปยังทั้งสองฝ่าย
     try {

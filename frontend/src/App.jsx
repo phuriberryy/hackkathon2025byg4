@@ -13,6 +13,7 @@ import PostItemModal from './components/modals/PostItemModal'
 import ExchangeRequestModal from './components/modals/ExchangeRequestModal'
 import NotificationsModal from './components/modals/NotificationsModal'
 import ChatModal from './components/modals/ChatModal'
+import ProtectedRoute from './components/auth/ProtectedRoute'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { API_BASE, notificationApi } from './lib/api'
 
@@ -24,13 +25,14 @@ function AppContent() {
   const [exchangeRequestOpen, setExchangeRequestOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
-  const [initialChatId, setInitialChatId] = useState(null)
+  const [selectedChatId, setSelectedChatId] = useState(null)
   const [selectedItem, setSelectedItem] = useState(null)
   const [unreadCount, setUnreadCount] = useState(0)
   const [itemsVersion, setItemsVersion] = useState(0)
   const { token, loading } = useAuth()
 
-  const isLoginPage = location.pathname === '/login'
+  const isLoginPage = location.pathname === '/login' || location.pathname === '/register'
+  const isAuthenticated = !!token
 
   const handlePostItem = () => {
     setPostItemOpen(true)
@@ -73,29 +75,24 @@ function AppContent() {
     socket.on('notification:new', () => {
       setUnreadCount((prev) => prev + 1)
     })
-    socket.on('chat:created', (chat) => {
-      setInitialChatId(chat.id)
-      setChatOpen(true)
-    })
     return () => {
       socket.disconnect()
     }
   }, [token])
 
+  // Listen for openChat custom event
   useEffect(() => {
     const handleOpenChat = (event) => {
-      const chatId = event.detail?.chatId ?? null
+      const { chatId } = event.detail || {}
       if (chatId) {
-        setInitialChatId(chatId)
-      } else {
-        setInitialChatId(null)
+        setSelectedChatId(chatId)
+        setChatOpen(true)
       }
-      setChatOpen(true)
     }
 
-    window.addEventListener('app:open-chat', handleOpenChat)
+    window.addEventListener('openChat', handleOpenChat)
     return () => {
-      window.removeEventListener('app:open-chat', handleOpenChat)
+      window.removeEventListener('openChat', handleOpenChat)
     }
   }, [])
 
@@ -109,7 +106,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen flex flex-col bg-surface">
-      {!isLoginPage && (
+      {isAuthenticated && !isLoginPage && (
         <Header
           unread={unreadCount}
           onNotificationsClick={handleNotificationsClick}
@@ -122,21 +119,37 @@ function AppContent() {
           <Route
             path="/"
             element={
-              <HomePage 
-                onExchangeItem={handleExchangeItem}
-                onPostItem={handlePostItem}
-                refreshKey={itemsVersion}
-              />
+              <ProtectedRoute>
+                <HomePage 
+                  onExchangeItem={handleExchangeItem}
+                  onPostItem={handlePostItem}
+                  refreshKey={itemsVersion}
+                />
+              </ProtectedRoute>
             }
           />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/exchange/:requestId" element={<ExchangeRequestDetailPage />} />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/exchange/:requestId"
+            element={
+              <ProtectedRoute>
+                <ExchangeRequestDetailPage />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </main>
-      {!isLoginPage && <Footer />}
+      {isAuthenticated && !isLoginPage && <Footer />}
 
       {/* Floating Message Button */}
-      {!isLoginPage && (
+      {isAuthenticated && !isLoginPage && (
         <button
           onClick={handleMessageClick}
           className="floating-message-button"
@@ -168,9 +181,9 @@ function AppContent() {
         open={chatOpen}
         onClose={() => {
           setChatOpen(false)
-          setInitialChatId(null)
+          setSelectedChatId(null)
         }}
-        initialChatId={initialChatId}
+        initialChatId={selectedChatId}
       />
     </div>
   )

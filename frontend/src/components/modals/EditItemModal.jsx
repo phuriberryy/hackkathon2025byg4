@@ -1,22 +1,37 @@
-import { useState } from 'react'
-import { CheckCircle, Image as ImageIcon } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Image as ImageIcon } from 'lucide-react'
 import Modal from '../ui/Modal'
-import { exchangeApi } from '../../lib/api'
+import { itemsApi } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 
-export default function ExchangeRequestModal({ open, onClose, itemId }) {
+export default function EditItemModal({ open, onClose, item, onSuccess }) {
   const [formData, setFormData] = useState({
     itemName: '',
     category: '',
     condition: '',
+    lookingFor: '',
+    availableUntil: '',
     pickupLocation: '',
     description: '',
   })
   const [imagePreview, setImagePreview] = useState(null)
-  const [includeMessage, setIncludeMessage] = useState(true)
-  const [message, setMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const { token } = useAuth()
+
+  useEffect(() => {
+    if (item && open) {
+      setFormData({
+        itemName: item.title || '',
+        category: item.category || '',
+        condition: item.item_condition || '',
+        lookingFor: item.looking_for || '',
+        availableUntil: item.available_until ? item.available_until.split('T')[0] : '',
+        pickupLocation: item.pickup_location || '',
+        description: item.description || '',
+      })
+      setImagePreview(item.image_url || null)
+    }
+  }, [item, open])
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -36,26 +51,26 @@ export default function ExchangeRequestModal({ open, onClose, itemId }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!token) {
-      alert('กรุณาเข้าสู่ระบบก่อนส่งคำขอแลกเปลี่ยน')
+    if (!token || !item) {
+      alert('กรุณาเข้าสู่ระบบก่อนแก้ไขโพสต์')
       return
     }
-    if (!itemId) return
     setSubmitting(true)
     try {
-      await exchangeApi.request(token, { itemId, message })
-      onClose()
-      setFormData({
-        itemName: '',
-        category: '',
-        condition: '',
-        pickupLocation: '',
-        description: '',
+      await itemsApi.update(token, item.id, {
+        title: formData.itemName,
+        category: formData.category,
+        itemCondition: formData.condition,
+        lookingFor: formData.lookingFor,
+        description: formData.description,
+        availableUntil: formData.availableUntil,
+        imageUrl: imagePreview,
+        pickupLocation: formData.pickupLocation,
       })
-      setMessage('')
-      setImagePreview(null)
+      onSuccess?.()
+      onClose()
     } catch (err) {
-      alert(err.message || 'ไม่สามารถส่งคำขอได้')
+      alert(err.message || 'ไม่สามารถแก้ไขโพสต์ได้')
     } finally {
       setSubmitting(false)
     }
@@ -78,30 +93,31 @@ export default function ExchangeRequestModal({ open, onClose, itemId }) {
     { value: 'Fair', label: 'Fair' },
   ]
 
+  if (!item) return null
+
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="ขอแลกเปลี่ยน"
-      subtitle="ส่งคำขอแลกเปลี่ยน"
+      title="แก้ไขโพสต์"
+      subtitle="แก้ไขข้อมูลของที่คุณโพสต์"
       size="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Image Upload */}
         <div>
           <label className="mb-2 block text-sm font-bold text-gray-900">
-            Upload Image of Your Item <span className="text-red-500">*</span>
+            Upload Image <span className="text-red-500">*</span>
           </label>
           <input
             type="file"
             accept="image/*"
             onChange={handleImageChange}
             className="hidden"
-            id="image-upload"
-            required
+            id="image-upload-edit"
           />
           <label
-            htmlFor="image-upload"
+            htmlFor="image-upload-edit"
             className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 p-12 text-center transition hover:border-primary hover:bg-primary/5"
           >
             {imagePreview ? (
@@ -125,14 +141,14 @@ export default function ExchangeRequestModal({ open, onClose, itemId }) {
         {/* Item Name */}
         <div>
           <label className="mb-2 block text-sm font-bold text-gray-900">
-            Your Item Name <span className="text-red-500">*</span>
+            Item Name <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             name="itemName"
             value={formData.itemName}
             onChange={handleInputChange}
-            placeholder="e.g., Study Desk"
+            placeholder="e.g., Calculus Textbook"
             className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-0"
             required
           />
@@ -178,17 +194,48 @@ export default function ExchangeRequestModal({ open, onClose, itemId }) {
           </div>
         </div>
 
+        {/* Looking to Exchange For */}
+        <div>
+          <label className="mb-2 block text-sm font-bold text-gray-900">
+            Looking to Exchange For <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            name="lookingFor"
+            value={formData.lookingFor}
+            onChange={handleInputChange}
+            placeholder="e.g., Laptop stand, Kitchen utensils, Study desk"
+            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-0"
+            required
+          />
+        </div>
+
+        {/* Expiration Date */}
+        <div>
+          <label className="mb-2 block text-sm font-bold text-gray-900">
+            วันหมดอายุของโพสต์ <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="date"
+            name="availableUntil"
+            value={formData.availableUntil}
+            onChange={handleInputChange}
+            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-0"
+            required
+          />
+        </div>
+
         {/* Pickup Location */}
         <div>
           <label className="mb-2 block text-sm font-bold text-gray-900">
-            Your Pickup Location <span className="text-red-500">*</span>
+            Pickup Location <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             name="pickupLocation"
             value={formData.pickupLocation}
             onChange={handleInputChange}
-            placeholder="e.g., Engineering Building"
+            placeholder="e.g., Engineering Building, Library 1st floor"
             className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-0"
             required
           />
@@ -197,39 +244,17 @@ export default function ExchangeRequestModal({ open, onClose, itemId }) {
         {/* Description */}
         <div>
           <label className="mb-2 block text-sm font-bold text-gray-900">
-            Describe Your Item <span className="text-red-500">*</span>
+            Description <span className="text-red-500">*</span>
           </label>
           <textarea
             name="description"
             value={formData.description}
             onChange={handleInputChange}
-            placeholder="Tell them about your item and why it's a good exchange..."
+            placeholder="Describe your item, its features, why you're sharing it..."
             rows={4}
             className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-0 resize-none"
             required
           />
-        </div>
-
-        {/* Message */}
-        <div>
-          <label className="mb-3 flex items-center gap-2 text-sm font-bold text-gray-900">
-            <input
-              type="checkbox"
-              checked={includeMessage}
-              onChange={(e) => setIncludeMessage(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-            />
-            <span>Message to seller</span>
-          </label>
-          {includeMessage && (
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Introduce yourself and explain why this would be a good exchange..."
-              rows={4}
-              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-0 resize-none"
-            />
-          )}
         </div>
 
         {/* Actions */}
@@ -244,18 +269,13 @@ export default function ExchangeRequestModal({ open, onClose, itemId }) {
           <button
             type="submit"
             disabled={submitting}
-            className="flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white shadow-md hover:bg-primary-dark transition disabled:opacity-60"
+            className="rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white shadow-md hover:bg-primary-dark transition disabled:opacity-60"
           >
-            <CheckCircle size={18} />
-            {submitting ? 'กำลังส่ง...' : 'Send Exchange Request'}
+            {submitting ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
           </button>
         </div>
       </form>
     </Modal>
   )
 }
-
-
-
-
 

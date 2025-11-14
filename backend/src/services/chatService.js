@@ -49,6 +49,11 @@ export const initChatServer = (server) => {
 
       if (!membership.rowCount) return
 
+      const chat = membership.rows[0]
+      if (chat.status !== 'active') {
+        return
+      }
+
       const messageResult = await query(
         `INSERT INTO messages (chat_id, sender_id, body)
          VALUES ($1,$2,$3)
@@ -59,7 +64,6 @@ export const initChatServer = (server) => {
       const message = messageResult.rows[0]
       io.to(chatId).emit('chat:message', message)
 
-      const chat = membership.rows[0]
       const recipientId = chat.creator_id === user.id ? chat.participant_id : chat.creator_id
 
       await query(
@@ -88,6 +92,7 @@ export const initChatServer = (server) => {
       }
 
       io.to(recipientId).emit('notification:new')
+      await query(`UPDATE chats SET updated_at=NOW() WHERE id=$1`, [chatId])
     })
   })
 
