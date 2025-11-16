@@ -4,7 +4,16 @@ import dotenv from 'dotenv'
 import { z } from 'zod'
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url))
-dotenv.config({ path: path.resolve(__dirname, '../../.env') })
+const envPath = path.resolve(__dirname, '../../.env')
+
+// Load .env file
+const result = dotenv.config({ path: envPath })
+if (result.error) {
+  console.warn('⚠️  Warning: Could not load .env file:', result.error.message)
+  console.warn('   Expected path:', envPath)
+} else {
+  console.log('✅ Loaded .env file from:', envPath)
+}
 
 const schema = z.object({
   PORT: z.coerce.number().default(4000),

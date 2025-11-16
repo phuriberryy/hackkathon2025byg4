@@ -5,15 +5,12 @@ import {
   Mail,
   MapPin,
   Package,
-  ShieldCheck,
-  Trash2,
   CheckCircle,
   Image as ImageIcon,
   Eye,
-  MoreVertical,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { profileApi, itemsApi, exchangeApi } from '../lib/api'
+import { profileApi, exchangeApi } from '../lib/api'
 import EditItemModal from '../components/modals/EditItemModal'
 import ManageItemModal from '../components/modals/ManageItemModal'
 
@@ -98,21 +95,6 @@ export default function ProfilePage() {
     // นับจำนวน exchange requests สำหรับ item นี้
     const count = exchangeRequests.filter((er) => er.item_id === itemId).length
     return count
-  }
-
-  const handleDeleteItem = async (itemId) => {
-    if (!token || !window.confirm('คุณแน่ใจหรือไม่ว่าต้องการลบโพสต์นี้?')) {
-      return
-    }
-
-    try {
-      await itemsApi.delete(token, itemId)
-      setMyItems(myItems.filter((item) => item.id !== itemId))
-      alert('ลบโพสต์สำเร็จ')
-    } catch (err) {
-      console.error('Failed to delete item:', err)
-      alert('ลบโพสต์ไม่สำเร็จ: ' + (err.message || 'Unknown error'))
-    }
   }
 
   const handleEditItem = (item) => {

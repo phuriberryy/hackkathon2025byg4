@@ -16,7 +16,7 @@ import { calculateItemCO2, calculateExchangeCO2Reduction } from '../utils/co2Cal
 export default function ExchangeRequestDetailPage() {
   const { requestId } = useParams()
   const navigate = useNavigate()
-  const { token, user } = useAuth()
+  const { token } = useAuth()
   const [exchangeRequest, setExchangeRequest] = useState(null)
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
@@ -31,10 +31,14 @@ export default function ExchangeRequestDetailPage() {
 
       try {
         setLoading(true)
-      const data = await exchangeApi.getById(token, requestId)
-      console.log('Exchange request data:', data)
-      console.log('Item image URL:', data.item_image_url)
-      setExchangeRequest(data)
+        const data = await exchangeApi.getById(token, requestId)
+        console.log('Exchange request data:', data)
+        console.log('Item image URL:', data.item_image_url)
+        console.log('Owner name:', data.owner_name)
+        console.log('Requester name:', data.requester_name)
+        console.log('Item title:', data.item_title)
+        console.log('Created at:', data.created_at)
+        setExchangeRequest(data)
         setError(null)
       } catch (err) {
         console.error('Failed to fetch exchange request:', err)
@@ -140,9 +144,9 @@ export default function ExchangeRequestDetailPage() {
                (c.creator_id === exchangeRequest.requester_id && c.participant_id === exchangeRequest.owner_id)
       })
 
-      if (chat) {
-        navigate(`/chat/${chat.id}`)
-      } else {
+      let chatId = chat?.id
+
+      if (!chatId) {
         // ถ้ายังไม่มี chat ให้สร้างใหม่
         const isOwner = exchangeRequest.user_role === 'owner'
         const otherUserId = isOwner ? exchangeRequest.requester_id : exchangeRequest.owner_id
@@ -150,7 +154,12 @@ export default function ExchangeRequestDetailPage() {
           participantId: otherUserId,
           itemId: exchangeRequest.item_id,
         })
-        navigate(`/chat/${newChat.id}`)
+        chatId = newChat.id
+      }
+
+      // Dispatch event เพื่อเปิด ChatModal
+      if (chatId) {
+        window.dispatchEvent(new CustomEvent('openChat', { detail: { chatId } }))
       }
     } catch (err) {
       console.error('Failed to start chat:', err)
@@ -159,8 +168,12 @@ export default function ExchangeRequestDetailPage() {
   }
 
   const formatTimeAgo = (date) => {
+    if (!date) return 'ไม่ทราบเวลา'
     const now = new Date()
-    const diff = now - new Date(date)
+    const dateObj = new Date(date)
+    if (isNaN(dateObj.getTime())) return 'ไม่ทราบเวลา'
+    const diff = now - dateObj
+    if (isNaN(diff)) return 'ไม่ทราบเวลา'
     const minutes = Math.floor(diff / 60000)
     const hours = Math.floor(diff / 3600000)
     const days = Math.floor(diff / 86400000)
@@ -211,13 +224,14 @@ export default function ExchangeRequestDetailPage() {
   }
 
   const isOwner = exchangeRequest.user_role === 'owner'
-  const otherUser = isOwner ? exchangeRequest.requester_name : exchangeRequest.owner_name
+  const otherUserName = isOwner ? exchangeRequest.requester_name : exchangeRequest.owner_name
+  const otherUser = otherUserName || (isOwner ? 'ผู้ขอแลก' : 'เจ้าของโพสต์')
   const otherUserFaculty = isOwner ? exchangeRequest.requester_faculty : exchangeRequest.owner_faculty
   const otherUserAvatar = isOwner ? exchangeRequest.requester_avatar_url : exchangeRequest.owner_avatar_url
-  const canAccept = exchangeRequest.status === 'pending'
-  const canReject = exchangeRequest.status === 'pending'
+  const canAccept = exchangeRequest.status === 'pending' || exchangeRequest.status === 'chatting'
+  const canReject = exchangeRequest.status === 'pending' || exchangeRequest.status === 'chatting'
   const bothAccepted = exchangeRequest.owner_accepted && exchangeRequest.requester_accepted
-  const showChatButton = exchangeRequest.status === 'accepted' || bothAccepted
+  const showChatButton = exchangeRequest.status === 'chatting' || exchangeRequest.status === 'accepted' || bothAccepted
 
   // คำนวณ CO₂ footprint และ CO₂ ที่ลดได้
   const calculateCO2 = () => {
@@ -251,7 +265,7 @@ export default function ExchangeRequestDetailPage() {
           {otherUserAvatar ? (
             <img src={otherUserAvatar} alt={otherUser} className="h-full w-full rounded-full object-cover" />
           ) : (
-            <span>{otherUser.charAt(0).toUpperCase()}</span>
+            <span>{(otherUser && otherUser.charAt(0)) || 'U'}</span>
           )}
         </div>
         <div className="flex-1">
@@ -278,7 +292,7 @@ export default function ExchangeRequestDetailPage() {
             <span className="text-lg font-semibold text-gray-900">คำขอแลกเปลี่ยน</span>
           </div>
           <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-gray-700">
-            ID: {exchangeRequest.id.slice(0, 8)}
+            ID: {exchangeRequest.id ? exchangeRequest.id.slice(0, 8) : 'N/A'}
           </span>
         </div>
 

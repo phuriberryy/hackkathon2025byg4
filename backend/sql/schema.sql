@@ -61,7 +61,15 @@ CREATE TABLE IF NOT EXISTS chats (
   exchange_request_id UUID REFERENCES exchange_requests(id) ON DELETE SET NULL,
   creator_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   participant_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status TEXT DEFAULT 'pending',
+  owner_accepted BOOLEAN DEFAULT FALSE,
+  requester_accepted BOOLEAN DEFAULT FALSE,
+  qr_code TEXT,
+  qr_confirmed BOOLEAN DEFAULT FALSE,
+  qr_confirmed_at TIMESTAMPTZ,
+  closed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
   CONSTRAINT check_different_participants CHECK (creator_id != participant_id)
 );
 

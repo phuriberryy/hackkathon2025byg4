@@ -126,63 +126,108 @@ export const createChat = async (req, res) => {
 }
 
 export const acceptChat = async (req, res) => {
-  if (!req.user) {
-    return res.status(401).json({ message: 'Unauthorized' })
-  }
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Unauthorized' })
+    }
 
-  const { chatId } = req.params
-  let chatRow = await fetchChatById(chatId)
+    const { chatId } = req.params
+    let chatRow = await fetchChatById(chatId)
 
-  if (!chatRow) {
-    return res.status(404).json({ message: 'Chat not found' })
-  }
+    if (!chatRow) {
+      return res.status(404).json({ message: 'Chat not found' })
+    }
 
-  if (chatRow.status === 'declined' || chatRow.closed_at) {
-    return res.status(400).json({ message: 'Chat has been closed' })
-  }
+    if (chatRow.status === 'declined' || chatRow.closed_at) {
+      return res.status(400).json({ message: 'Chat has been closed' })
+    }
 
-  const role = resolveChatRole(chatRow, req.user.id)
-  if (!role || role === 'viewer' || role === 'participant' || role === 'creator') {
-    return res.status(403).json({ message: 'You are not part of this chat or action not allowed' })
-  }
+    if (!chatRow.exchange_request_id) {
+      return res.status(400).json({ message: 'Chat confirmation is only available for exchange chats' })
+    }
 
-  if (!chatRow.exchange_request_id) {
-    return res.status(400).json({ message: 'Chat confirmation is only available for exchange chats' })
-  }
+    const role = resolveChatRole(chatRow, req.user.id)
+    if (!role || role === 'viewer') {
+      return res.status(403).json({ message: 'You are not part of this chat' })
+    }
 
-  const column = role === 'owner' ? 'owner_accepted' : 'requester_accepted'
-  if (chatRow[column]) {
-    return res.json(mapChatRow(chatRow, req.user.id))
-  }
+    // สำหรับ exchange chat ต้องเป็น owner หรือ requester เท่านั้น
+    if (role !== 'owner' && role !== 'requester') {
+      return res.status(403).json({ message: 'Only owner or requester can accept exchange chat' })
+    }
 
-  await query(
-    `UPDATE chats 
-     SET ${column}=TRUE,
-         updated_at=NOW()
-     WHERE id=$1`,
-    [chatId]
-  )
+    const column = role === 'owner' ? 'owner_accepted' : 'requester_accepted'
+    
+    // ถ้ายอมรับแล้ว ให้เช็คว่าต้องสร้าง QR code หรือไม่
+    if (chatRow[column]) {
+      // ถ้าทั้งสองฝ่าย accept แล้วแต่ยังไม่มี QR code ให้สร้างเลย
+      if (chatRow.owner_accepted && chatRow.requester_accepted && !chatRow.qr_code) {
+        try {
+          const qrCode = generateExchangeCode()
+          await query(
+            `UPDATE chats 
+             SET qr_code=$2,
+                 updated_at=NOW()
+             WHERE id=$1`,
+            [chatId, qrCode]
+          )
+          chatRow = await fetchChatById(chatId)
+        } catch (err) {
+          console.error('Failed to generate QR code:', err)
+        }
+      }
+      return res.json(mapChatRow(chatRow, req.user.id))
+    }
 
-  chatRow = await fetchChatById(chatId)
-
-  // --- START: โค้ดที่แก้ไข ---
-  // เช็คว่าทั้งสองฝ่าย accept และ QR Code ยังไม่เคยถูกสร้าง
-  if (chatRow.owner_accepted && chatRow.requester_accepted && !chatRow.qr_code) {
-    const qrCode = generateExchangeCode() // สร้าง code ใหม่เลย ไม่ต้อง check `||`
     await query(
       `UPDATE chats 
-       SET qr_code=$2,
+       SET ${column}=TRUE,
            updated_at=NOW()
        WHERE id=$1`,
-      // ไม่ต้องอัปเดต status='active' เพราะมัน active อยู่แล้ว
-      [chatId, qrCode]
+      [chatId]
     )
-    chatRow = await fetchChatById(chatId)
-  }
-  // --- END: โค้ดที่แก้ไข ---
 
-  broadcastChatUpdate(chatRow)
-  return res.json(mapChatRow(chatRow, req.user.id))
+    chatRow = await fetchChatById(chatId)
+
+    // --- START: โค้ดที่แก้ไข ---
+    // เช็คว่าทั้งสองฝ่าย accept และ QR Code ยังไม่เคยถูกสร้าง
+    if (chatRow && chatRow.owner_accepted && chatRow.requester_accepted && !chatRow.qr_code) {
+      try {
+        const qrCode = generateExchangeCode() // สร้าง code ใหม่เลย ไม่ต้อง check `||`
+        await query(
+          `UPDATE chats 
+           SET qr_code=$2,
+               updated_at=NOW()
+           WHERE id=$1`,
+          // ไม่ต้องอัปเดต status='active' เพราะมัน active อยู่แล้ว
+          [chatId, qrCode]
+        )
+        chatRow = await fetchChatById(chatId)
+      } catch (err) {
+        console.error('Failed to generate QR code:', err)
+        // ไม่ throw error เพื่อไม่ให้การ accept ล้มเหลว
+      }
+    }
+    // --- END: โค้ดที่แก้ไข ---
+
+    try {
+      if (chatRow) {
+        broadcastChatUpdate(chatRow)
+      }
+    } catch (err) {
+      console.error('Failed to broadcast chat update:', err)
+      // ไม่ throw error เพื่อไม่ให้การ accept ล้มเหลว
+    }
+
+    if (!chatRow) {
+      return res.status(500).json({ message: 'Failed to fetch updated chat' })
+    }
+
+    return res.json(mapChatRow(chatRow, req.user.id))
+  } catch (err) {
+    console.error('Accept chat error:', err)
+    return res.status(500).json({ message: 'Internal server error' })
+  }
 }
 
 export const declineChat = async (req, res) => {
@@ -450,11 +495,26 @@ function resolveChatRole(row, userId) {
 
 function broadcastChatUpdate(chatRow) {
   if (!chatRow) return
-  const io = getChatServer()
-  if (!io) return
+  try {
+    const io = getChatServer()
+    if (!io) return
 
-  io.to(chatRow.creator_id).emit('chat:updated', mapChatRow(chatRow, chatRow.creator_id))
-  io.to(chatRow.participant_id).emit('chat:updated', mapChatRow(chatRow, chatRow.participant_id))
+    try {
+      const chatForCreator = mapChatRow(chatRow, chatRow.creator_id)
+      io.to(chatRow.creator_id).emit('chat:updated', chatForCreator)
+    } catch (err) {
+      console.error('Failed to map chat for creator:', err)
+    }
+
+    try {
+      const chatForParticipant = mapChatRow(chatRow, chatRow.participant_id)
+      io.to(chatRow.participant_id).emit('chat:updated', chatForParticipant)
+    } catch (err) {
+      console.error('Failed to map chat for participant:', err)
+    }
+  } catch (err) {
+    console.error('Failed to broadcast chat update:', err)
+  }
 }
 
 function generateExchangeCode() {

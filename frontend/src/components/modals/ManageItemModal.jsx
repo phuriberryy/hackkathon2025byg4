@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
-import { X, User, Mail, Building2, Clock, MessageCircle } from 'lucide-react'
-import { itemsApi, exchangeApi } from '../../lib/api'
+import { useState, useEffect, useCallback } from 'react'
+import { X, Mail, Building2, Clock, MessageCircle } from 'lucide-react'
+import { itemsApi } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 
@@ -11,13 +11,7 @@ export default function ManageItemModal({ open, onClose, item, onUpdate }) {
   const { token } = useAuth()
   const navigate = useNavigate()
 
-  useEffect(() => {
-    if (open && item && token) {
-      fetchExchangeRequests()
-    }
-  }, [open, item, token])
-
-  const fetchExchangeRequests = async () => {
+  const fetchExchangeRequests = useCallback(async () => {
     if (!item || !token) return
 
     try {
@@ -31,7 +25,13 @@ export default function ManageItemModal({ open, onClose, item, onUpdate }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [item, token])
+
+  useEffect(() => {
+    if (open && item && token) {
+      fetchExchangeRequests()
+    }
+  }, [open, item, token, fetchExchangeRequests])
 
   const handleViewRequest = (requestId) => {
     navigate(`/exchange/${requestId}`)

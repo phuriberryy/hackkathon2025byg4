@@ -16,7 +16,6 @@ import {
   User as UserIcon,
 } from 'lucide-react'
 import { itemsApi } from '../lib/api'
-import { calculateItemCO2 } from '../utils/co2Calculator'
 
 export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
   const [searchQuery, setSearchQuery] = useState('')

@@ -4,7 +4,11 @@ const handleResponse = async (res) => {
   if (res.status === 204) return null
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
-    throw new Error(data.message || 'Request failed')
+    const error = new Error(data.message || 'Request failed')
+    // Attach additional error data for error handling
+    if (data.errors) error.errors = data.errors
+    if (data.existingRequestId) error.existingRequestId = data.existingRequestId
+    throw error
   }
   return data
 }

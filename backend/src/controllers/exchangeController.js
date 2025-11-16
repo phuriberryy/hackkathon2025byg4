@@ -1,4 +1,5 @@
 import { validationResult } from 'express-validator'
+import { randomBytes } from 'crypto'
 import { query } from '../db/pool.js'
 import { sendEmail } from '../utils/email.js'
 import { calculateItemCO2, calculateExchangeCO2Reduction } from '../utils/co2Calculator.js'
@@ -12,10 +13,16 @@ export const createExchangeRequest = async (req, res) => {
 
   const errors = validationResult(req)
   if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() })
+    console.error('Validation errors:', errors.array())
+    console.error('Request body:', req.body)
+    return res.status(400).json({ 
+      message: 'Validation failed',
+      errors: errors.array() 
+    })
   }
 
   const { itemId, message } = req.body
+  console.log('Creating exchange request:', { itemId, message, userId: req.user.id })
 
   try {
     const itemResult = await query(
@@ -35,14 +42,24 @@ export const createExchangeRequest = async (req, res) => {
       return res.status(400).json({ message: 'You cannot exchange your own item' })
     }
 
-    // ตรวจสอบว่ามีคำขอแลกเปลี่ยนอยู่แล้วหรือไม่
+    // ตรวจสอบว่ามีคำขอแลกเปลี่ยนอยู่แล้วหรือไม่ (pending, chatting, in_progress)
     const existingRequest = await query(
-      'SELECT id FROM exchange_requests WHERE item_id=$1 AND requester_id=$2 AND status=$3',
-      [itemId, req.user.id, 'pending']
+      `SELECT id, status FROM exchange_requests 
+       WHERE item_id=$1 AND requester_id=$2 AND status IN ('pending', 'chatting', 'in_progress')`,
+      [itemId, req.user.id]
     )
 
     if (existingRequest.rowCount > 0) {
-      return res.status(400).json({ message: 'You have already sent an exchange request for this item' })
+      const existing = existingRequest.rows[0]
+      const statusMap = {
+        'pending': 'รอการตอบรับ',
+        'chatting': 'กำลังแชท',
+        'in_progress': 'กำลังดำเนินการ'
+      }
+      return res.status(400).json({ 
+        message: `คุณได้ส่งคำขอแลกเปลี่ยนสำหรับสินค้านี้ไปแล้ว (สถานะ: ${statusMap[existing.status] || existing.status})`,
+        existingRequestId: existing.id
+      })
     }
 
     const exchangeResult = await query(
@@ -94,14 +111,17 @@ export const createExchangeRequest = async (req, res) => {
     // --- START: โค้ดที่เพิ่มเข้ามา ---
     // สร้างแชทที่เชื่อมโยงกับ exchange request นี้ทันที
     const chatResult = await query(
-      `INSERT INTO chats (creator_id, participant_id, item_id, exchange_request_id, status, updated_at)
-       VALUES ($1,$2,$3,$4,'active',NOW())
+      `INSERT INTO chats (creator_id, participant_id, item_id, exchange_request_id, status, owner_accepted, requester_accepted)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
        RETURNING id`,
       [
         req.user.id, // ผู้สร้างแชท (ผู้ขอแลก)
         item.user_id, // ผู้เข้าร่วม (เจ้าของ)
         itemId,
-        exchangeRequest.id
+        exchangeRequest.id,
+        'pending', // status เริ่มต้นเป็น pending
+        false, // owner_accepted เริ่มต้นเป็น false
+        false  // requester_accepted เริ่มต้นเป็น false
       ]
     )
     const chatId = chatResult.rows[0].id;
@@ -579,6 +599,18 @@ async function completeExchange(requestId, exchangeRequest) {
     }
     
     const chatId = chatResult.rows[0].id
+    
+    // อัปเดต chat ให้ status='active', owner_accepted=TRUE, requester_accepted=TRUE
+    // แต่ยังไม่สร้าง QR code - QR code จะถูกสร้างเมื่อผู้ใช้กด "ยอมรับ" ใน chat modal
+    await query(
+      `UPDATE chats 
+       SET status='active',
+           owner_accepted=TRUE,
+           requester_accepted=TRUE,
+           updated_at=NOW()
+       WHERE id=$1`,
+      [chatId]
+    )
     // --- END: โค้ดที่แก้ไข ---
 
     const metadata = JSON.stringify({ exchangeRequestId: requestId, chatId, itemId: exchangeRequest.item_id })

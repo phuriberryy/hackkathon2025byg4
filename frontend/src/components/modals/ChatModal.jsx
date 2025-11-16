@@ -434,11 +434,13 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                       <div className="rounded-2xl bg-yellow-50 px-4 py-3 text-sm text-yellow-800 shadow-inner">
                         <p className="font-semibold text-yellow-900">ยืนยันเพื่อเปิดแชท</p>
                         <p className="mt-1 text-xs text-yellow-700">
-                          {hasAccepted
+                          {hasAccepted && otherAccepted
+                            ? 'กรุณายอมรับเพื่อสร้าง QR Code ยืนยันการแลกเปลี่ยน'
+                            : hasAccepted
                             ? 'คุณยืนยันแล้ว กำลังรออีกฝ่ายตอบรับ'
                             : 'กรุณายอมรับเพื่อเปิดการสนทนาและสร้าง QR Code ยืนยันการแลกเปลี่ยน'}
                         </p>
-                        {!hasAccepted && (
+                        {(!hasAccepted || (hasAccepted && otherAccepted)) && (
                           <div className="mt-3 flex flex-wrap gap-2">
                             <button
                               type="button"

@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { CheckCircle, Image as ImageIcon } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import Modal from '../ui/Modal'
 import { exchangeApi } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 
 export default function ExchangeRequestModal({ open, onClose, itemId }) {
+  const navigate = useNavigate()
   const [formData, setFormData] = useState({
     itemName: '',
     category: '',
@@ -40,10 +42,15 @@ export default function ExchangeRequestModal({ open, onClose, itemId }) {
       alert('กรุณาเข้าสู่ระบบก่อนส่งคำขอแลกเปลี่ยน')
       return
     }
-    if (!itemId) return
+    if (!itemId) {
+      alert('ไม่พบข้อมูลสินค้า กรุณาลองใหม่อีกครั้ง')
+      return
+    }
     setSubmitting(true)
     try {
-      await exchangeApi.request(token, { itemId, message })
+      console.log('Sending exchange request:', { itemId, message })
+      await exchangeApi.request(token, { itemId, message: message || undefined })
+      alert('ส่งคำขอแลกเปลี่ยนสำเร็จ')
       onClose()
       setFormData({
         itemName: '',
@@ -55,7 +62,21 @@ export default function ExchangeRequestModal({ open, onClose, itemId }) {
       setMessage('')
       setImagePreview(null)
     } catch (err) {
-      alert(err.message || 'ไม่สามารถส่งคำขอได้')
+      console.error('Exchange request error:', err)
+      const errorMsg = err.message || (err.errors && JSON.stringify(err.errors)) || 'ไม่สามารถส่งคำขอได้'
+      
+      // ถ้ามี existingRequestId แสดงข้อความและถามว่าต้องการดูคำขอที่มีอยู่หรือไม่
+      if (err.existingRequestId) {
+        const shouldView = window.confirm(
+          errorMsg + '\n\nคุณต้องการไปดูคำขอที่มีอยู่หรือไม่?'
+        )
+        if (shouldView) {
+          onClose()
+          navigate(`/exchange/${err.existingRequestId}`)
+        }
+      } else {
+        alert('ส่งคำขอแลกเปลี่ยนไม่สำเร็จ: ' + errorMsg)
+      }
     } finally {
       setSubmitting(false)
     }
@@ -254,6 +275,8 @@ export default function ExchangeRequestModal({ open, onClose, itemId }) {
     </Modal>
   )
 }
+
+
 
 
 
