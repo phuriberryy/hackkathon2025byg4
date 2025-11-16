@@ -105,7 +105,7 @@ export default function LoginPage() {
                 <span>จดจำฉันไว้</span>
               </label>
               <Link
-                to="#"
+                to="/forgot-password"
                 className="text-sm font-semibold text-primary hover:underline"
               >
                 ลืมรหัสผ่าน?

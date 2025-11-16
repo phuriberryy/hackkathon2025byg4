@@ -11,7 +11,6 @@ export default function ExchangeRequestModal({ open, onClose, itemId }) {
     itemName: '',
     category: '',
     condition: '',
-    pickupLocation: '',
     description: '',
   })
   const [imagePreview, setImagePreview] = useState(null)
@@ -46,24 +45,75 @@ export default function ExchangeRequestModal({ open, onClose, itemId }) {
       alert('ไม่พบข้อมูลสินค้า กรุณาลองใหม่อีกครั้ง')
       return
     }
+
+    // Validate form fields
+    if (!formData.itemName.trim()) {
+      alert('กรุณากรอกชื่อสินค้าของคุณ')
+      return
+    }
+    if (!formData.category) {
+      alert('กรุณาเลือกหมวดหมู่')
+      return
+    }
+    if (!formData.condition) {
+      alert('กรุณาเลือกสภาพสินค้า')
+      return
+    }
+    if (!formData.description.trim()) {
+      alert('กรุณากรอกรายละเอียดสินค้า')
+      return
+    }
+
     setSubmitting(true)
     try {
-      console.log('Sending exchange request:', { itemId, message })
-      await exchangeApi.request(token, { itemId, message: message || undefined })
+      // Convert image to base64 if exists
+      let imageUrl = null
+      if (imagePreview) {
+        imageUrl = imagePreview // imagePreview is already base64 from FileReader
+      }
+
+      const payload = {
+        itemId,
+        message: message || undefined,
+        requesterItemName: formData.itemName || undefined,
+        requesterItemCategory: formData.category || undefined,
+        requesterItemCondition: formData.condition || undefined,
+        requesterItemDescription: formData.description || undefined,
+        requesterItemImageUrl: imageUrl || undefined,
+      }
+
+      console.log('=== Sending Exchange Request ===')
+      console.log('Item ID (Owner):', itemId)
+      console.log('Requester Item Name:', formData.itemName)
+      console.log('Requester Item Category:', formData.category)
+      console.log('Requester Item Condition:', formData.condition)
+      console.log('Requester Item Image URL:', imageUrl ? `${imageUrl.substring(0, 50)}...` : 'null')
+      console.log('Full payload:', {
+        ...payload,
+        requesterItemImageUrl: imageUrl ? `${imageUrl.substring(0, 50)}... (base64)` : 'null'
+      })
+      console.log('================================')
+      await exchangeApi.request(token, payload)
       alert('ส่งคำขอแลกเปลี่ยนสำเร็จ')
       onClose()
       setFormData({
         itemName: '',
         category: '',
         condition: '',
-        pickupLocation: '',
         description: '',
       })
       setMessage('')
       setImagePreview(null)
     } catch (err) {
       console.error('Exchange request error:', err)
-      const errorMsg = err.message || (err.errors && JSON.stringify(err.errors)) || 'ไม่สามารถส่งคำขอได้'
+      let errorMsg = err.message || (err.errors && JSON.stringify(err.errors)) || 'ไม่สามารถส่งคำขอได้'
+      
+      // แปลง error message เป็นภาษาไทย
+      if (errorMsg.includes('You cannot exchange your own item')) {
+        errorMsg = 'คุณไม่สามารถแลกเปลี่ยนสินค้าของตัวเองได้'
+      } else if (errorMsg.includes('already exists') || errorMsg.includes('already sent')) {
+        errorMsg = 'คุณได้ส่งคำขอแลกเปลี่ยนสำหรับสินค้านี้ไปแล้ว'
+      }
       
       // ถ้ามี existingRequestId แสดงข้อความและถามว่าต้องการดูคำขอที่มีอยู่หรือไม่
       if (err.existingRequestId) {
@@ -84,12 +134,14 @@ export default function ExchangeRequestModal({ open, onClose, itemId }) {
 
   const categoryOptions = [
     { value: '', label: 'Select category' },
-    { value: 'Books & Textbooks', label: 'Books & Textbooks' },
-    { value: 'Clothes', label: 'Clothes' },
-    { value: 'Electronics', label: 'Electronics' },
-    { value: 'Dorm Items', label: 'Dorm Items' },
-    { value: 'Sports Equipment', label: 'Sports Equipment' },
-    { value: 'Eco Items', label: 'Eco Items' },
+    { value: 'Clothes & Fashion', label: '👕 Clothes & Fashion (เสื้อผ้า, กางเกง, รองเท้า)' },
+    { value: 'Dorm Essentials', label: '🏡 Dorm Essentials (หม้อหุงข้าว, ราวตากผ้า, ผ้าห่ม)' },
+    { value: 'Books & Study', label: '📚 Books & Study (ตำราเรียน, สมุด, ไฟอ่านหนังสือ)' },
+    { value: 'Kitchen & Appliances', label: '🍳 Kitchen & Appliances (กระทะ, เขียง, หม้อทอด)' },
+    { value: 'Cleaning & Laundry', label: '🧼 Cleaning & Laundry (น้ำยาซักผ้า, ไม้ถูพื้น, ไม้กวาด)' },
+    { value: 'Hobbies & Entertainment', label: '🎮 Hobbies & Entertainment (บอร์ดเกม, กีตาร์, ของสะสม)' },
+    { value: 'Sports Gear', label: '🏀 Sports Gear (รองเท้ากีฬา, ลูกบอล, เสื่อโยคะ)' },
+    { value: 'Others', label: '✨ Others (อื่น ๆ)' },
   ]
 
   const conditionOptions = [
@@ -119,7 +171,6 @@ export default function ExchangeRequestModal({ open, onClose, itemId }) {
             onChange={handleImageChange}
             className="hidden"
             id="image-upload"
-            required
           />
           <label
             htmlFor="image-upload"
@@ -197,22 +248,6 @@ export default function ExchangeRequestModal({ open, onClose, itemId }) {
               ))}
             </select>
           </div>
-        </div>
-
-        {/* Pickup Location */}
-        <div>
-          <label className="mb-2 block text-sm font-bold text-gray-900">
-            Your Pickup Location <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            name="pickupLocation"
-            value={formData.pickupLocation}
-            onChange={handleInputChange}
-            placeholder="e.g., Engineering Building"
-            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-0"
-            required
-          />
         </div>
 
         {/* Description */}

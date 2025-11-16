@@ -11,13 +11,25 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
+        if (parsed && parsed.user && parsed.token) {
       setUser(parsed.user)
       setToken(parsed.token)
-    }
+        } else {
+          // ถ้าข้อมูลไม่ครบ ให้ลบออก
+          localStorage.removeItem(STORAGE_KEY)
+        }
+      }
+    } catch (err) {
+      // ถ้า JSON.parse fail ให้ลบข้อมูลเสียออก
+      console.error('Failed to parse auth data:', err)
+      localStorage.removeItem(STORAGE_KEY)
+    } finally {
     setLoading(false)
+    }
   }, [])
 
   const persist = (nextUser, nextToken) => {

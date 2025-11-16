@@ -78,12 +78,14 @@ export default function EditItemModal({ open, onClose, item, onSuccess }) {
 
   const categoryOptions = [
     { value: '', label: 'Select category' },
-    { value: 'Books & Textbooks', label: 'Books & Textbooks' },
-    { value: 'Clothes', label: 'Clothes' },
-    { value: 'Electronics', label: 'Electronics' },
-    { value: 'Dorm Items', label: 'Dorm Items' },
-    { value: 'Sports Equipment', label: 'Sports Equipment' },
-    { value: 'Eco Items', label: 'Eco Items' },
+    { value: 'Clothes & Fashion', label: '👕 Clothes & Fashion (เสื้อผ้า, กางเกง, รองเท้า)' },
+    { value: 'Dorm Essentials', label: '🏡 Dorm Essentials (หม้อหุงข้าว, ราวตากผ้า, ผ้าห่ม)' },
+    { value: 'Books & Study', label: '📚 Books & Study (ตำราเรียน, สมุด, ไฟอ่านหนังสือ)' },
+    { value: 'Kitchen & Appliances', label: '🍳 Kitchen & Appliances (กระทะ, เขียง, หม้อทอด)' },
+    { value: 'Cleaning & Laundry', label: '🧼 Cleaning & Laundry (น้ำยาซักผ้า, ไม้ถูพื้น, ไม้กวาด)' },
+    { value: 'Hobbies & Entertainment', label: '🎮 Hobbies & Entertainment (บอร์ดเกม, กีตาร์, ของสะสม)' },
+    { value: 'Sports Gear', label: '🏀 Sports Gear (รองเท้ากีฬา, ลูกบอล, เสื่อโยคะ)' },
+    { value: 'Others', label: '✨ Others (อื่น ๆ)' },
   ]
 
   const conditionOptions = [

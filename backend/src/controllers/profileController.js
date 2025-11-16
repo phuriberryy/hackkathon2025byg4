@@ -60,7 +60,18 @@ export const getMyItems = async (req, res) => {
       [req.user.id]
     )
 
-    return res.json(result.rows)
+    // แยก items ที่หมดอายุแล้วแต่ยังไม่ถูกแลกเปลี่ยน
+    const today = new Date().toISOString().split('T')[0]
+    const items = result.rows.map(item => {
+      const isExpired = item.available_until && item.available_until < today
+      const isNotExchanged = item.status !== 'exchanged'
+      return {
+        ...item,
+        is_expired: isExpired && isNotExchanged
+      }
+    })
+
+    return res.json(items)
   } catch (err) {
     console.error('Get my items error:', err)
     return res.status(500).json({ message: 'Internal server error' })

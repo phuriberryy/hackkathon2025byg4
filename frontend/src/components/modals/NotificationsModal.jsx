@@ -17,9 +17,8 @@ export default function NotificationsModal({ open, onClose, onUnreadChange }) {
       setLoading(true)
       try {
         const data = await notificationApi.list(token)
+        // แสดง notifications ทั้งหมด (history) แต่ badge จะแสดงเฉพาะ unread
         setNotifications(data)
-        const unreadCount = data.filter((n) => !n.read).length
-        onUnreadChange?.(unreadCount)
       } catch (err) {
         console.error('Failed to fetch notifications:', err)
       } finally {
@@ -28,23 +27,52 @@ export default function NotificationsModal({ open, onClose, onUnreadChange }) {
     }
 
     fetchNotifications()
-  }, [open, token, onUnreadChange])
+  }, [open, token])
 
-  const handleViewExchangeRequest = (notification) => {
+  // แยก useEffect เพื่ออัปเดต unread count หลังจาก notifications เปลี่ยน
+  useEffect(() => {
+    if (onUnreadChange) {
+      const unreadCount = notifications.filter((n) => !n.read).length
+      onUnreadChange(unreadCount)
+    }
+  }, [notifications, onUnreadChange])
+
+  const handleMarkAsRead = async (notification) => {
+    if (!token || notification.read) return
+
+    try {
+      await notificationApi.markNotificationRead(token, notification.id)
+      // อัปเดต notification เป็น read แต่ยังแสดงใน list (history)
+      setNotifications((prev) => 
+        prev.map((n) => 
+          n.id === notification.id ? { ...n, read: true } : n
+        )
+      )
+      // unread count จะถูกอัปเดตอัตโนมัติผ่าน useEffect ที่แยกออกมา
+    } catch (err) {
+      console.error('Failed to mark notification as read:', err)
+    }
+  }
+
+  const handleViewExchangeRequest = async (notification) => {
     const metadata = notification.metadata || {}
     const exchangeRequestId = metadata.exchangeRequestId || metadata.exchangeRequest_id
 
     if (exchangeRequestId) {
+      // Mark as read ก่อน navigate
+      await handleMarkAsRead(notification)
       onClose()
       navigate(`/exchange/${exchangeRequestId}`)
     }
   }
 
-  const handleOpenChat = (notification) => {
+  const handleOpenChat = async (notification) => {
     const metadata = notification.metadata || {}
     const chatId = metadata.chatId || metadata.chat_id
 
     if (chatId) {
+      // Mark as read ก่อนเปิด chat
+      await handleMarkAsRead(notification)
       onClose()
       // ส่ง custom event เพื่อเปิด ChatModal พร้อม chatId
       window.dispatchEvent(new CustomEvent('openChat', { detail: { chatId } }))
@@ -113,14 +141,17 @@ export default function NotificationsModal({ open, onClose, onUnreadChange }) {
                   className={`rounded-[20px] bg-white p-5 shadow-sm transition hover:shadow-md ${
                     !notification.read ? 'border-l-4 border-primary' : ''
                   }`}
-                  onClick={() => {
+                  onClick={async () => {
                     if (isExchangeRequest || isCompleted) {
-                      handleViewExchangeRequest(notification)
+                      await handleViewExchangeRequest(notification)
                     } else if (isMessage && chatId) {
-                      handleOpenChat(notification)
+                      await handleOpenChat(notification)
+                    } else {
+                      // ถ้าไม่ใช่ exchange request หรือ message ก็ mark as read เมื่อคลิก
+                      await handleMarkAsRead(notification)
                     }
                   }}
-                  style={{ cursor: (isExchangeRequest || isCompleted || (isMessage && chatId)) ? 'pointer' : 'default' }}
+                  style={{ cursor: 'pointer' }}
                 >
                   <div className="flex items-start gap-4">
                     <div className={`flex h-12 w-12 items-center justify-center rounded-full ${

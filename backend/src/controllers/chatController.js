@@ -2,6 +2,7 @@ import { randomBytes } from 'crypto'
 import { validationResult } from 'express-validator'
 import { query } from '../db/pool.js'
 import { getChatServer } from '../services/chatService.js'
+import { calculateItemCO2, calculateExchangeCO2Reduction } from '../utils/co2Calculator.js'
 
 export const getChats = async (req, res) => {
   if (!req.user) {
@@ -9,9 +10,34 @@ export const getChats = async (req, res) => {
   }
 
   const rows = await fetchChatsForUser(req.user.id)
-  const chats = rows.map((row) => mapChatRow(row, req.user.id))
+  const allChats = rows.map((row) => mapChatRow(row, req.user.id))
 
-  return res.json(chats)
+  // กรองแชทที่มีอีเมลเดียวกันออก เหลือแค่แชทเดียว (ล่าสุด)
+  const chatMap = new Map()
+  for (const chat of allChats) {
+    const participantEmail = chat.participant_email
+    if (!chatMap.has(participantEmail)) {
+      chatMap.set(participantEmail, chat)
+    } else {
+      // ถ้ามีแชทเดิมแล้ว ให้เปรียบเทียบว่าแชทไหนใหม่กว่า
+      const existingChat = chatMap.get(participantEmail)
+      const existingTime = existingChat.last_message?.created_at || existingChat.created_at
+      const currentTime = chat.last_message?.created_at || chat.created_at
+      if (new Date(currentTime) > new Date(existingTime)) {
+        chatMap.set(participantEmail, chat)
+      }
+    }
+  }
+
+  // แปลง Map กลับเป็น Array และเรียงตามเวลาล่าสุด
+  const uniqueChats = Array.from(chatMap.values())
+  uniqueChats.sort((a, b) => {
+    const timeA = new Date(a.last_message?.created_at || a.created_at)
+    const timeB = new Date(b.last_message?.created_at || b.created_at)
+    return timeB - timeA
+  })
+
+  return res.json(uniqueChats)
 }
 
 export const getChatMessages = async (req, res) => {
@@ -30,10 +56,74 @@ export const getChatMessages = async (req, res) => {
     return res.status(403).json({ message: 'You do not have access to this chat' })
   }
 
+  // ดึงข้อความพร้อมข้อมูลสถานะการอ่าน
+  // ตรวจสอบว่า column read_at มีอยู่หรือไม่
+  let hasReadAtColumn = false
+  try {
+    const columnCheck = await query(
+      `SELECT 1 FROM information_schema.columns 
+       WHERE table_name = 'messages' AND column_name = 'read_at'`
+    )
+    hasReadAtColumn = columnCheck.rowCount > 0
+  } catch (err) {
+    console.warn('Could not check for read_at column:', err)
+  }
+
   const result = await query(
-    `SELECT * FROM messages WHERE chat_id=$1 ORDER BY created_at ASC`,
-    [chatId]
+    hasReadAtColumn
+      ? `SELECT 
+          m.*,
+          CASE WHEN m.sender_id = $2 THEN true ELSE false END as is_sent_by_me,
+          CASE WHEN m.read_at IS NOT NULL THEN true ELSE false END as is_read
+         FROM messages m
+         WHERE m.chat_id=$1 
+         ORDER BY m.created_at ASC`
+      : `SELECT 
+          m.*,
+          CASE WHEN m.sender_id = $2 THEN true ELSE false END as is_sent_by_me,
+          false as is_read
+         FROM messages m
+         WHERE m.chat_id=$1 
+         ORDER BY m.created_at ASC`,
+    [chatId, req.user.id]
   )
+
+  // Mark messages as read when user opens the chat (ถ้ามี column read_at)
+  let updateResult = { rows: [] }
+  if (hasReadAtColumn) {
+    try {
+      updateResult = await query(
+        `UPDATE messages 
+         SET read_at = NOW()
+         WHERE chat_id = $1 
+           AND sender_id != $2 
+           AND read_at IS NULL
+         RETURNING id, sender_id`,
+        [chatId, req.user.id]
+      )
+    } catch (err) {
+      console.warn('Could not update read_at:', err)
+    }
+  }
+
+  // Emit event to notify senders that their messages were read
+  const io = getChatServer()
+  if (io && updateResult.rows.length > 0) {
+    const readMessages = updateResult.rows
+    const readAt = new Date().toISOString()
+    
+    // Group by sender to emit once per sender
+    const senderIds = [...new Set(readMessages.map(m => m.sender_id))]
+    senderIds.forEach(senderId => {
+      const messageIds = readMessages
+        .filter(m => m.sender_id === senderId)
+        .map(m => m.id)
+      
+      messageIds.forEach(messageId => {
+        io.to(senderId).emit('message:read', { messageId, readAt })
+      })
+    })
+  }
 
   return res.json(result.rows)
 }
@@ -67,12 +157,15 @@ export const createChat = async (req, res) => {
     return res.status(400).json({ message: 'Cannot chat with yourself' })
   }
 
+  // ตรวจสอบว่ามีแชทกับอีเมลเดียวกันอยู่แล้วหรือไม่ (ไม่สนใจ item_id หรือ exchange_request_id)
   const existing = await query(
     `SELECT id FROM chats 
      WHERE ((creator_id=$1 AND participant_id=$2) OR (creator_id=$2 AND participant_id=$1))
-       AND ($3::uuid IS NULL OR item_id=$3)
-       AND ($4::uuid IS NULL OR exchange_request_id=$4)`,
-    [req.user.id, participant, itemId || null, exchangeRequestId || null]
+       AND status != 'declined'
+       AND closed_at IS NULL
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [req.user.id, participant]
   )
 
   if (existing.rowCount) {
@@ -138,8 +231,39 @@ export const acceptChat = async (req, res) => {
       return res.status(404).json({ message: 'Chat not found' })
     }
 
-    if (chatRow.status === 'declined' || chatRow.closed_at) {
-      return res.status(400).json({ message: 'Chat has been closed' })
+    // ตรวจสอบว่า chat ถูกปิดแล้วหรือไม่ แต่ถ้าเป็น exchange chat ที่ทั้งสองฝ่าย accept แล้ว
+    // และ status ยังเป็น 'declined' อาจจะต้อง reset กลับเป็น 'active'
+    if (chatRow.status === 'declined' && chatRow.closed_at) {
+      // ถ้าเป็น exchange chat และทั้งสองฝ่าย accept แล้ว ให้ reset กลับเป็น active
+      if (chatRow.exchange_request_id) {
+        const exchangeRequestResult = await query(
+          `SELECT owner_accepted, requester_accepted, status 
+           FROM exchange_requests 
+           WHERE id=$1`,
+          [chatRow.exchange_request_id]
+        )
+        if (exchangeRequestResult.rowCount > 0) {
+          const er = exchangeRequestResult.rows[0]
+          // ถ้าทั้งสองฝ่าย accept แล้ว ให้ reset chat status
+          if (er.owner_accepted && er.requester_accepted && er.status === 'chatting') {
+            await query(
+              `UPDATE chats 
+               SET status='active',
+                   closed_at=NULL,
+                   updated_at=NOW()
+               WHERE id=$1`,
+              [chatId]
+            )
+            chatRow = await fetchChatById(chatId)
+          } else {
+            return res.status(400).json({ message: 'Chat has been closed' })
+          }
+        } else {
+          return res.status(400).json({ message: 'Chat has been closed' })
+        }
+      } else {
+        return res.status(400).json({ message: 'Chat has been closed' })
+      }
     }
 
     if (!chatRow.exchange_request_id) {
@@ -203,8 +327,58 @@ export const acceptChat = async (req, res) => {
           [chatId, qrCode]
         )
         chatRow = await fetchChatById(chatId)
+        
+        // เมื่อทั้งสองฝ่าย accept ใน chat แล้ว ให้เปลี่ยน item status เป็น 'exchanged' (หายจากหน้าฟีด)
+        if (chatRow && chatRow.exchange_request_id) {
+          const exchangeRequestResult = await query(
+            `SELECT er.item_id, er.owner_id, er.requester_id, i.category, i.item_condition
+             FROM exchange_requests er
+             JOIN items i ON er.item_id = i.id
+             WHERE er.id=$1`,
+            [chatRow.exchange_request_id]
+          )
+          if (exchangeRequestResult.rowCount > 0) {
+            const exchangeData = exchangeRequestResult.rows[0]
+            const itemId = exchangeData.item_id
+            
+            // เปลี่ยน item status เป็น 'exchanged' (หายจากหน้าฟีด)
+            await query(
+              `UPDATE items 
+               SET status='exchanged', updated_at=NOW()
+               WHERE id=$1`,
+              [itemId]
+            )
+            
+            // อัปเดต exchange_request status เป็น 'in_progress'
+            await query(
+              `UPDATE exchange_requests 
+               SET status='in_progress', updated_at=NOW()
+               WHERE id=$1`,
+              [chatRow.exchange_request_id]
+            )
+            
+            // สร้าง exchange history (ถ้ายังไม่มี)
+            const existingHistory = await query(
+              `SELECT id FROM exchange_history WHERE exchange_request_id=$1`,
+              [chatRow.exchange_request_id]
+            )
+            
+            if (!existingHistory.rowCount) {
+              // คำนวณ CO₂ footprint
+              const co2OwnerItem = calculateItemCO2(exchangeData.category, exchangeData.item_condition)
+              const co2Reduced = co2OwnerItem * 0.75
+              
+              // สร้าง exchange history
+              await query(
+                `INSERT INTO exchange_history (exchange_request_id, item_id, owner_id, requester_id, co2_reduced)
+                 VALUES ($1,$2,$3,$4,$5)`,
+                [chatRow.exchange_request_id, itemId, exchangeData.owner_id, exchangeData.requester_id, parseFloat(co2Reduced.toFixed(2))]
+              )
+            }
+          }
+        }
       } catch (err) {
-        console.error('Failed to generate QR code:', err)
+        console.error('Failed to generate QR code or update item status:', err)
         // ไม่ throw error เพื่อไม่ให้การ accept ล้มเหลว
       }
     }
@@ -266,6 +440,40 @@ export const declineChat = async (req, res) => {
   await query(`UPDATE chats SET ${updates.join(', ')} WHERE id=$1`, [chatId])
 
   chatRow = await fetchChatById(chatId)
+  
+  // เมื่อ reject ใน chat ให้เปลี่ยน item status กลับเป็น 'active' และ exchange_request status กลับเป็น 'pending'
+  if (chatRow && chatRow.exchange_request_id) {
+    try {
+      const exchangeRequestResult = await query(
+        `SELECT item_id FROM exchange_requests WHERE id=$1`,
+        [chatRow.exchange_request_id]
+      )
+      if (exchangeRequestResult.rowCount > 0) {
+        const itemId = exchangeRequestResult.rows[0].item_id
+        // เปลี่ยน item status กลับเป็น 'active'
+        await query(
+          `UPDATE items 
+           SET status='active', updated_at=NOW()
+           WHERE id=$1`,
+          [itemId]
+        )
+        // เปลี่ยน exchange_request status กลับเป็น 'pending'
+        await query(
+          `UPDATE exchange_requests 
+           SET status='pending', 
+               owner_accepted=FALSE,
+               requester_accepted=FALSE,
+               updated_at=NOW()
+           WHERE id=$1`,
+          [chatRow.exchange_request_id]
+        )
+      }
+    } catch (err) {
+      console.error('Failed to revert item status:', err)
+      // ไม่ throw error เพื่อไม่ให้การ decline ล้มเหลว
+    }
+  }
+  
   broadcastChatUpdate(chatRow)
   return res.json(mapChatRow(chatRow, req.user.id))
 }
@@ -309,15 +517,90 @@ export const confirmChatQr = async (req, res) => {
     return res.status(400).json({ message: 'รหัสไม่ถูกต้อง กรุณาลองใหม่' })
   }
 
+  // อัปเดต QR confirmed แต่ไม่ปิดแชท เพื่อให้ยังสามารถส่งข้อความได้
   await query(
     `UPDATE chats 
      SET qr_confirmed=TRUE,
          qr_confirmed_at=NOW(),
-         closed_at=NOW(),
          updated_at=NOW()
      WHERE id=$1`,
     [chatId]
   )
+
+  // สร้าง exchange history เมื่อยืนยัน QR code (ถ้ายังไม่มี)
+  if (chatRow.exchange_request_id) {
+    try {
+      const existingHistory = await query(
+        `SELECT id FROM exchange_history WHERE exchange_request_id=$1`,
+        [chatRow.exchange_request_id]
+      )
+      
+      if (!existingHistory.rowCount) {
+        // ดึงข้อมูล exchange request และ items
+        const exchangeRequestResult = await query(
+          `SELECT 
+            er.item_id,
+            er.requester_id,
+            er.requester_item_category,
+            er.requester_item_condition,
+            i.user_id as owner_id,
+            i.category as owner_item_category,
+            i.item_condition as owner_item_condition
+           FROM exchange_requests er
+           JOIN items i ON er.item_id = i.id
+           WHERE er.id=$1`,
+          [chatRow.exchange_request_id]
+        )
+        
+        if (exchangeRequestResult.rowCount > 0) {
+          const exchangeData = exchangeRequestResult.rows[0]
+          
+          // คำนวณ CO₂ footprint ของทั้งสอง items
+          const co2OwnerItem = calculateItemCO2(
+            exchangeData.owner_item_category,
+            exchangeData.owner_item_condition
+          )
+          const co2RequesterItem = exchangeData.requester_item_category && exchangeData.requester_item_condition
+            ? calculateItemCO2(
+                exchangeData.requester_item_category,
+                exchangeData.requester_item_condition
+              )
+            : co2OwnerItem // ถ้าไม่มี requester item ให้ใช้ค่าเดียวกับ owner item
+          
+          // คำนวณ CO₂ ที่ลดได้
+          const co2Reduced = calculateExchangeCO2Reduction(co2OwnerItem, co2RequesterItem)
+          
+          // สร้าง exchange history
+          await query(
+            `INSERT INTO exchange_history (exchange_request_id, item_id, owner_id, requester_id, co2_reduced)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [
+              chatRow.exchange_request_id,
+              exchangeData.item_id,
+              exchangeData.owner_id,
+              exchangeData.requester_id,
+              parseFloat(co2Reduced.toFixed(2))
+            ]
+          )
+          
+          // อัปเดต item status เป็น 'exchanged'
+          await query(
+            `UPDATE items SET status='exchanged', updated_at=NOW() WHERE id=$1`,
+            [exchangeData.item_id]
+          )
+          
+          // อัปเดต exchange_request status เป็น 'completed'
+          await query(
+            `UPDATE exchange_requests SET status='completed', updated_at=NOW() WHERE id=$1`,
+            [chatRow.exchange_request_id]
+          )
+        }
+      }
+    } catch (err) {
+      console.error('Failed to create exchange history:', err)
+      // ไม่ throw error เพื่อไม่ให้การยืนยัน QR ล้มเหลว
+    }
+  }
 
   chatRow = await fetchChatById(chatId)
   broadcastChatUpdate(chatRow)

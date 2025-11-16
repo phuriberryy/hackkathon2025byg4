@@ -21,8 +21,28 @@ export const createExchangeRequest = async (req, res) => {
     })
   }
 
-  const { itemId, message } = req.body
-  console.log('Creating exchange request:', { itemId, message, userId: req.user.id })
+  const { 
+    itemId, 
+    message,
+    requesterItemName,
+    requesterItemCategory,
+    requesterItemCondition,
+    requesterItemDescription,
+    requesterItemImageUrl,
+    requesterPickupLocation
+  } = req.body
+  console.log('=== Creating Exchange Request ===')
+  console.log('Item ID (Owner):', itemId)
+  console.log('Requester ID:', req.user.id)
+  console.log('Message:', message)
+  console.log('--- Requester Item Info ---')
+  console.log('  Name:', requesterItemName)
+  console.log('  Category:', requesterItemCategory)
+  console.log('  Condition:', requesterItemCondition)
+  console.log('  Description:', requesterItemDescription)
+  console.log('  Image URL:', requesterItemImageUrl)
+  console.log('  Pickup Location:', requesterPickupLocation)
+  console.log('==========================')
 
   try {
     const itemResult = await query(
@@ -63,13 +83,39 @@ export const createExchangeRequest = async (req, res) => {
     }
 
     const exchangeResult = await query(
-      `INSERT INTO exchange_requests (item_id, requester_id, message)
-       VALUES ($1,$2,$3)
+      `INSERT INTO exchange_requests (
+        item_id, 
+        requester_id, 
+        message,
+        requester_item_name,
+        requester_item_category,
+        requester_item_condition,
+        requester_item_description,
+        requester_item_image_url,
+        requester_pickup_location
+      )
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        RETURNING *`,
-      [itemId, req.user.id, message || null]
+      [
+        itemId, 
+        req.user.id, 
+        message || null,
+        requesterItemName || null,
+        requesterItemCategory || null,
+        requesterItemCondition || null,
+        requesterItemDescription || null,
+        requesterItemImageUrl || null,
+        requesterPickupLocation || null
+      ]
     )
 
     const exchangeRequest = exchangeResult.rows[0]
+    
+    console.log('=== Exchange Request Created ===')
+    console.log('Exchange Request ID:', exchangeRequest.id)
+    console.log('Requester Item Image URL (saved):', exchangeRequest.requester_item_image_url)
+    console.log('Requester Item Name (saved):', exchangeRequest.requester_item_name)
+    console.log('================================')
 
     // สร้าง notification สำหรับเจ้าของโพสต์
     await query(
@@ -176,6 +222,12 @@ export const getExchangeRequest = async (req, res) => {
         requester.email as requester_email,
         requester.faculty as requester_faculty,
         requester.avatar_url as requester_avatar_url,
+        er.requester_item_name,
+        er.requester_item_category,
+        er.requester_item_condition,
+        er.requester_item_description,
+        er.requester_item_image_url,
+        er.requester_pickup_location,
         CASE 
           WHEN i.user_id = $2 THEN 'owner'
           ELSE 'requester'
@@ -193,6 +245,28 @@ export const getExchangeRequest = async (req, res) => {
     }
 
     const exchangeRequest = result.rows[0]
+    
+    // Debug log
+    console.log('=== Exchange Request Detail (Backend) ===')
+    console.log('Request ID:', requestId)
+    console.log('User ID:', req.user.id)
+    console.log('User Role:', exchangeRequest.user_role)
+    console.log('--- Owner Item (ฝั่งซ้าย) ---')
+    console.log('  Item ID:', exchangeRequest.item_id)
+    console.log('  Title:', exchangeRequest.item_title)
+    console.log('  Image URL:', exchangeRequest.item_image_url)
+    console.log('  Category:', exchangeRequest.item_category)
+    console.log('  Condition:', exchangeRequest.item_condition)
+    console.log('  Owner ID:', exchangeRequest.item_owner_id)
+    console.log('  Owner Name:', exchangeRequest.owner_name)
+    console.log('--- Requester Item (ฝั่งขวา) ---')
+    console.log('  Name:', exchangeRequest.requester_item_name)
+    console.log('  Image URL:', exchangeRequest.requester_item_image_url)
+    console.log('  Category:', exchangeRequest.requester_item_category)
+    console.log('  Condition:', exchangeRequest.requester_item_condition)
+    console.log('  Requester ID:', exchangeRequest.requester_id)
+    console.log('  Requester Name:', exchangeRequest.requester_name)
+    console.log('=========================================')
 
     // ตรวจสอบสิทธิ์ (เจ้าของโพสต์หรือผู้ขอแลกเท่านั้นที่ดูได้)
     if (exchangeRequest.item_owner_id !== req.user.id && exchangeRequest.requester_id !== req.user.id) {
@@ -303,22 +377,56 @@ export const acceptExchangeRequestByOwner = async (req, res) => {
       await completeExchange(requestId, exchangeRequest)
     }
 
-    // ดึงข้อมูล exchange request ที่อัปเดตแล้ว
+    // ดึงข้อมูล exchange request ที่อัปเดตแล้ว (รวม status ที่อาจเปลี่ยนเป็น 'chatting' แล้ว)
     const finalResult = await query(
       `SELECT 
         er.*,
+        i.id as item_id,
         i.title as item_title,
+        i.category as item_category,
+        i.item_condition as item_condition,
+        i.description as item_description,
+        i.image_url as item_image_url,
+        i.pickup_location as item_pickup_location,
+        i.user_id as item_owner_id,
+        owner.id as owner_id,
         owner.name as owner_name,
-        requester.name as requester_name
+        owner.email as owner_email,
+        owner.faculty as owner_faculty,
+        owner.avatar_url as owner_avatar_url,
+        requester.id as requester_id,
+        requester.name as requester_name,
+        requester.email as requester_email,
+        requester.faculty as requester_faculty,
+        requester.avatar_url as requester_avatar_url,
+        er.requester_item_name,
+        er.requester_item_category,
+        er.requester_item_condition,
+        er.requester_item_description,
+        er.requester_item_image_url,
+        er.requester_pickup_location,
+        CASE 
+          WHEN i.user_id = $2 THEN 'owner'
+          ELSE 'requester'
+        END as user_role
        FROM exchange_requests er
        JOIN items i ON er.item_id = i.id
        JOIN users owner ON i.user_id = owner.id
        JOIN users requester ON er.requester_id = requester.id
        WHERE er.id=$1`,
-      [requestId]
+      [requestId, req.user.id]
     )
 
-    return res.json({ success: true, message: 'Exchange request accepted', exchangeRequest: finalResult.rows[0] })
+    const exchangeRequestData = finalResult.rows[0]
+    
+    return res.json({ 
+      success: true, 
+      message: 'Exchange request accepted', 
+      exchangeRequest: exchangeRequestData,
+      // ส่งข้อมูลเพิ่มเติมเพื่อให้ frontend ตรวจสอบได้ง่าย
+      bothAccepted: exchangeRequestData.owner_accepted && exchangeRequestData.requester_accepted,
+      status: exchangeRequestData.status
+    })
   } catch (err) {
     console.error('Accept exchange request error:', err)
     return res.status(500).json({ message: 'Internal server error' })
@@ -389,22 +497,56 @@ export const acceptExchangeRequestByRequester = async (req, res) => {
       await completeExchange(requestId, exchangeRequest)
     }
 
-    // ดึงข้อมูล exchange request ที่อัปเดตแล้ว
+    // ดึงข้อมูล exchange request ที่อัปเดตแล้ว (รวม status ที่อาจเปลี่ยนเป็น 'chatting' แล้ว)
     const finalResult = await query(
       `SELECT 
         er.*,
+        i.id as item_id,
         i.title as item_title,
+        i.category as item_category,
+        i.item_condition as item_condition,
+        i.description as item_description,
+        i.image_url as item_image_url,
+        i.pickup_location as item_pickup_location,
+        i.user_id as item_owner_id,
+        owner.id as owner_id,
         owner.name as owner_name,
-        requester.name as requester_name
+        owner.email as owner_email,
+        owner.faculty as owner_faculty,
+        owner.avatar_url as owner_avatar_url,
+        requester.id as requester_id,
+        requester.name as requester_name,
+        requester.email as requester_email,
+        requester.faculty as requester_faculty,
+        requester.avatar_url as requester_avatar_url,
+        er.requester_item_name,
+        er.requester_item_category,
+        er.requester_item_condition,
+        er.requester_item_description,
+        er.requester_item_image_url,
+        er.requester_pickup_location,
+        CASE 
+          WHEN i.user_id = $2 THEN 'owner'
+          ELSE 'requester'
+        END as user_role
        FROM exchange_requests er
        JOIN items i ON er.item_id = i.id
        JOIN users owner ON i.user_id = owner.id
        JOIN users requester ON er.requester_id = requester.id
        WHERE er.id=$1`,
-      [requestId]
+      [requestId, req.user.id]
     )
 
-    return res.json({ success: true, message: 'Exchange request accepted', exchangeRequest: finalResult.rows[0] })
+    const exchangeRequestData = finalResult.rows[0]
+    
+    return res.json({ 
+      success: true, 
+      message: 'Exchange request accepted', 
+      exchangeRequest: exchangeRequestData,
+      // ส่งข้อมูลเพิ่มเติมเพื่อให้ frontend ตรวจสอบได้ง่าย
+      bothAccepted: exchangeRequestData.owner_accepted && exchangeRequestData.requester_accepted,
+      status: exchangeRequestData.status
+    })
   } catch (err) {
     console.error('Accept exchange request by requester error:', err)
     return res.status(500).json({ message: 'Internal server error' })
@@ -541,12 +683,22 @@ export const getMyExchangeRequests = async (req, res) => {
 // Helper function: สร้าง chat และ exchange history เมื่อทั้งสองฝ่าย accept
 async function completeExchange(requestId, exchangeRequest) {
   try {
-    // อัปเดต status เป็น accepted
+    // อัปเดต status เป็น 'chatting' เมื่อทั้งสองฝ่าย accept แล้ว
+    // จะเปลี่ยนเป็น 'in_progress' เมื่อยอมรับใน chat
+    // และ 'completed' เมื่อ finalize
     await query(
       `UPDATE exchange_requests 
-       SET status='accepted', updated_at=NOW()
+       SET status='chatting', updated_at=NOW()
        WHERE id=$1`,
       [requestId]
+    )
+    
+    // อัปเดต item status เป็น 'in_progress' (ยังไม่หายจากหน้าฟีด แต่แสดงว่า "กำลังดำเนินการ")
+    await query(
+      `UPDATE items 
+       SET status='in_progress', updated_at=NOW()
+       WHERE id=$1`,
+      [exchangeRequest.item_id]
     )
 
     // ดึงข้อมูล item ของ owner
@@ -561,29 +713,8 @@ async function completeExchange(requestId, exchangeRequest) {
 
     const ownerItem = ownerItemResult.rows[0]
 
-    // คำนวณ CO₂ footprint ของ item ของ owner
-    const co2OwnerItem = calculateItemCO2(ownerItem.category, ownerItem.item_condition)
-
-    // TODO: ถ้าในอนาคตมี requester_item_id จะคำนวณจากทั้งสอง items
-    // ตอนนี้คำนวณจาก item ของ owner เท่านั้น โดยประมาณว่า
-    // การแลกเปลี่ยนช่วยลด CO₂ ได้ 75% ของค่า footprint ของ item
-    const co2Reduced = co2OwnerItem * 0.75
-
-    // สร้าง exchange history
-    const historyResult = await query(
-      `INSERT INTO exchange_history (exchange_request_id, item_id, owner_id, requester_id, co2_reduced)
-       VALUES ($1,$2,$3,$4,$5)
-       RETURNING *`,
-      [requestId, exchangeRequest.item_id, exchangeRequest.owner_id, exchangeRequest.requester_id, parseFloat(co2Reduced.toFixed(2))]
-    )
-
-    // อัปเดต item status เป็น exchanged
-    await query(
-      `UPDATE items 
-       SET status='exchanged', updated_at=NOW()
-       WHERE id=$1`,
-      [exchangeRequest.item_id]
-    )
+    // ไม่ต้องสร้าง exchange history ที่นี่ เพราะจะสร้างเมื่อ accept ใน chat
+    // exchange history จะถูกสร้างเมื่อทั้งสองฝ่าย accept ใน chat และ finalize การแลกเปลี่ยน
 
    // --- START: โค้ดที่แก้ไข ---
     // เราจะไม่สร้างแชทใหม่ แต่จะไป "ค้นหา" แชทเดิมที่ถูกสร้างไว้แล้ว
@@ -601,12 +732,14 @@ async function completeExchange(requestId, exchangeRequest) {
     const chatId = chatResult.rows[0].id
     
     // อัปเดต chat ให้ status='active', owner_accepted=TRUE, requester_accepted=TRUE
+    // Reset closed_at และ status กลับเป็น 'active' (ถ้าเคยถูก reject มาก่อน)
     // แต่ยังไม่สร้าง QR code - QR code จะถูกสร้างเมื่อผู้ใช้กด "ยอมรับ" ใน chat modal
     await query(
       `UPDATE chats 
        SET status='active',
            owner_accepted=TRUE,
            requester_accepted=TRUE,
+           closed_at=NULL,
            updated_at=NOW()
        WHERE id=$1`,
       [chatId]

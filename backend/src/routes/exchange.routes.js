@@ -21,6 +21,12 @@ router.post(
   [
     body('itemId').isUUID(),
     body('message').optional().isString(),
+    body('requesterItemName').optional().isString(),
+    body('requesterItemCategory').optional().isString(),
+    body('requesterItemCondition').optional().isString(),
+    body('requesterItemDescription').optional().isString(),
+    body('requesterItemImageUrl').optional().isString(),
+    body('requesterPickupLocation').optional().isString(),
   ],
   createExchangeRequest
 )

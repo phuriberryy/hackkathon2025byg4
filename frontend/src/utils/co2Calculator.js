@@ -4,13 +4,14 @@
 
 // ค่า CO₂ footprint ต่อ category (kg CO₂e ต่อ 1 item)
 const CO2_BY_CATEGORY = {
-  'Books & Textbooks': 2.5,
-  'Clothes': 15.0,
-  'Electronics': 45.0,
-  'Dorm Items': 8.0,
-  'Sports Equipment': 12.0,
-  'Eco Items': 3.0,
-  'Other': 5.0,
+  'Clothes & Fashion': 8.0, // เสื้อผ้า, กางเกง, รองเท้า
+  'Dorm Essentials': 10.0, // หม้อหุงข้าว, ราวตากผ้า, ผ้าห่ม
+  'Books & Study': 20.0, // ตำราเรียน, สมุด, ไฟอ่านหนังสือ
+  'Kitchen & Appliances': 15.0, // กระทะ, เขียง, หม้อทอด
+  'Cleaning & Laundry': 6.0, // น้ำยาซักผ้า, ไม้ถูพื้น, ไม้กวาด
+  'Hobbies & Entertainment': 10.0, // บอร์ดเกม, กีตาร์, ของสะสม
+  'Sports Gear': 10.0, // รองเท้ากีฬา, ลูกบอล, เสื่อโยคะ
+  'Others': 5.0, // อื่น ๆ
 }
 
 // Multiplier ตาม condition
@@ -27,7 +28,7 @@ const CONDITION_MULTIPLIER = {
  * @returns {number} CO₂ footprint ในหน่วย kg CO₂e
  */
 export function calculateItemCO2(category, condition) {
-  const baseCO2 = CO2_BY_CATEGORY[category] || CO2_BY_CATEGORY['Other']
+  const baseCO2 = CO2_BY_CATEGORY[category] || CO2_BY_CATEGORY['Others']
   const multiplier = CONDITION_MULTIPLIER[condition] || CONDITION_MULTIPLIER['Good']
   return baseCO2 * multiplier
 }
@@ -57,7 +58,7 @@ export function calculateExchangeCO2Reduction(co2Item1, co2Item2 = null) {
  * @returns {number} CO₂ footprint ในหน่วย kg CO₂e
  */
 export function getCO2ByCategory(category) {
-  return CO2_BY_CATEGORY[category] || CO2_BY_CATEGORY['Other']
+  return CO2_BY_CATEGORY[category] || CO2_BY_CATEGORY['Others']
 }
 
 /**

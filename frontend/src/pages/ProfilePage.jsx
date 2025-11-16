@@ -8,6 +8,7 @@ import {
   CheckCircle,
   Image as ImageIcon,
   Eye,
+  Clock3,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { profileApi, exchangeApi } from '../lib/api'
@@ -25,6 +26,10 @@ export default function ProfilePage() {
   const [showManageItemModal, setShowManageItemModal] = useState(false)
   const [selectedItem, setSelectedItem] = useState(null)
   const { user, token } = useAuth()
+
+  // แยก items ที่หมดอายุแล้วแต่ยังไม่ถูกแลกเปลี่ยน
+  const activeItems = myItems.filter(item => !item.is_expired)
+  const expiredItems = myItems.filter(item => item.is_expired)
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -93,8 +98,23 @@ export default function ProfilePage() {
 
   const getItemViews = (itemId) => {
     // นับจำนวน exchange requests สำหรับ item นี้
-    const count = exchangeRequests.filter((er) => er.item_id === itemId).length
+    if (!exchangeRequests || !Array.isArray(exchangeRequests)) return 0
+    const count = exchangeRequests.filter((er) => er && er.item_id === itemId).length
     return count
+  }
+
+  const canEditItem = (item) => {
+    // ตรวจสอบว่ามี exchange request ที่ accept แล้วหรือไม่
+    if (!exchangeRequests || !Array.isArray(exchangeRequests)) return true
+    const hasAcceptedRequest = exchangeRequests.some((er) => 
+      er && 
+      er.item_id === item.id && 
+      (er.status === 'chatting' || 
+       er.status === 'in_progress' || 
+       er.owner_accepted === true || 
+       er.requester_accepted === true)
+    )
+    return !hasAcceptedRequest
   }
 
   const handleEditItem = (item) => {
@@ -115,7 +135,7 @@ export default function ProfilePage() {
         setMyItems(data)
       } catch (err) {
         console.error('Failed to refresh items:', err)
-      }
+  }
     }
   }
 
@@ -159,20 +179,28 @@ export default function ProfilePage() {
           </div>
 
           <div className="mt-16 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div>
+            <div className="flex-1">
               <h1 className="text-3xl font-bold text-gray-900">{displayUser.name || 'Your Name'}</h1>
-              <div className="mt-4 space-y-2 text-sm text-gray-600">
-                <div className="flex items-center gap-2 text-base text-gray-800">
-                  <User size={18} className="text-primary" />
-                  {displayUser.faculty || 'CMU Student'}
+              <div className="mt-4 space-y-3">
+                {displayUser.faculty && (
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                      <User size={20} className="text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-gray-500">คณะ/วิทยาลัย</p>
+                      <p className="text-base font-semibold text-gray-900">{displayUser.faculty}</p>
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                    <Mail size={20} className="text-primary" />
                 </div>
-                <div className="flex items-center gap-2">
-                  <Mail size={16} className="text-primary/60" />
-                  {displayUser.email}
+                  <div>
+                    <p className="text-xs font-medium text-gray-500">อีเมล</p>
+                    <p className="text-base font-semibold text-gray-900">{displayUser.email}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <MapPin size={16} className="text-primary/60" />
-                  {displayUser.faculty || 'Chiang Mai University'}
                 </div>
               </div>
             </div>
@@ -192,28 +220,39 @@ export default function ProfilePage() {
 
         <div className="flex items-center gap-4 border-t border-gray-100 px-8 py-4">
           <div className="flex flex-1 items-center justify-center gap-2 rounded-full bg-[#F0F7F1] px-4 py-2">
-            <button
-              onClick={() => setActiveTab('posts')}
+          <button
+            onClick={() => setActiveTab('posts')}
               className={`flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
-                activeTab === 'posts'
+              activeTab === 'posts'
                   ? 'bg-gray-200 text-gray-800'
                   : 'bg-transparent text-gray-700'
-              }`}
-            >
-              <Package size={16} />
-              โพสต์ของฉัน
-            </button>
-            <button
-              onClick={() => setActiveTab('history')}
+            }`}
+          >
+            <Package size={16} />
+            โพสต์ของฉัน
+          </button>
+          <button
+            onClick={() => setActiveTab('expired')}
               className={`flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
-                activeTab === 'history'
+              activeTab === 'expired'
                   ? 'bg-gray-200 text-gray-800'
                   : 'bg-transparent text-gray-700'
-              }`}
-            >
-              <ArrowRightLeft size={16} />
-              ประวัติการแลกเปลี่ยน
-            </button>
+            }`}
+          >
+            <Clock3 size={16} />
+            หมดอายุแล้ว ({expiredItems.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+              className={`flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+              activeTab === 'history'
+                  ? 'bg-gray-200 text-gray-800'
+                  : 'bg-transparent text-gray-700'
+            }`}
+          >
+            <ArrowRightLeft size={16} />
+            ประวัติการแลกเปลี่ยน
+          </button>
           </div>
         </div>
       </section>
@@ -221,16 +260,17 @@ export default function ProfilePage() {
       <div className="mt-10">
         {activeTab === 'posts' ? (
           <div>
-            {myItems.length === 0 ? (
+            {activeItems.length === 0 ? (
               <div className="rounded-[32px] bg-white p-12 text-center shadow-soft">
-                <p className="text-lg font-semibold text-gray-700">No posts yet.</p>
+                <p className="text-lg font-semibold text-gray-700">No active posts yet.</p>
                 <p className="mt-2 text-sm text-gray-500">Start sharing items to see them appear in your profile.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {myItems.map((item) => {
+                {activeItems.map((item) => {
                   const views = getItemViews(item.id)
                   const isActive = item.status === 'active'
+                  const canEdit = canEditItem(item)
 
                   return (
                     <div
@@ -280,13 +320,118 @@ export default function ProfilePage() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleManageItem(item)}
-                            className="flex-1 rounded-full bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/20"
+                            disabled={!canEdit}
+                            className="flex-1 rounded-full bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={!canEdit ? 'ไม่สามารถแก้ไขได้ เนื่องจากมีคำขอแลกเปลี่ยนที่ยอมรับแล้ว' : ''}
                           >
                             จัดการ
                           </button>
                           <button
                             onClick={() => handleEditItem(item)}
-                            className="flex-1 rounded-full bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
+                            disabled={!canEdit}
+                            className="flex-1 rounded-full bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={!canEdit ? 'ไม่สามารถแก้ไขได้ เนื่องจากมีคำขอแลกเปลี่ยนที่ยอมรับแล้ว' : ''}
+                          >
+                            แก้ไข
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        ) : activeTab === 'expired' ? (
+          <div>
+            <div className="mb-6 rounded-[24px] bg-yellow-50 border border-yellow-200 p-6">
+              <div className="flex items-start gap-3">
+                <Clock3 size={24} className="text-yellow-600 flex-shrink-0 mt-1" />
+                <div>
+                  <h3 className="text-lg font-semibold text-yellow-900 mb-2">โพสต์ที่หมดอายุแล้ว</h3>
+                  <p className="text-sm text-yellow-800">
+                    โพสต์เหล่านี้หมดอายุแล้วแต่ยังไม่ได้รับการแลกเปลี่ยน คุณสามารถลบหรืออัปเดตได้
+                  </p>
+                </div>
+              </div>
+            </div>
+            {expiredItems.length === 0 ? (
+              <div className="rounded-[32px] bg-white p-12 text-center shadow-soft">
+                <Clock3 size={48} className="mx-auto mb-4 text-gray-400" />
+                <p className="text-lg font-semibold text-gray-700">ไม่มีโพสต์ที่หมดอายุ</p>
+                <p className="mt-2 text-sm text-gray-500">โพสต์ที่หมดอายุแล้วจะแสดงที่นี่</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {expiredItems.map((item) => {
+                  const views = getItemViews(item.id)
+                  const canEdit = canEditItem(item)
+                  const expiredDate = item.available_until ? new Date(item.available_until).toLocaleDateString('th-TH') : 'ไม่ระบุ'
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="group relative overflow-hidden rounded-[24px] bg-white border-2 border-yellow-200 shadow-soft transition hover:shadow-card opacity-90"
+                    >
+                      {/* Image with Expired Badge */}
+                      <div className="relative h-48 w-full overflow-hidden">
+                        {item.image_url ? (
+                          <img
+                            src={item.image_url}
+                            alt={item.title}
+                            className="h-full w-full object-cover grayscale-[30%]"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-gray-100">
+                            <ImageIcon size={48} className="text-gray-400" />
+                          </div>
+                        )}
+                        <span className="absolute right-3 top-3 rounded-full bg-red-500 px-3 py-1 text-xs font-semibold text-white shadow-md">
+                          หมดอายุแล้ว
+                        </span>
+                        <div className="absolute left-3 top-3 rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-800">
+                          <Clock3 size={12} className="inline mr-1" />
+                          หมดอายุ: {expiredDate}
+                        </div>
+                      </div>
+
+                      {/* Content */}
+                      <div className="p-5">
+                        <div className="mb-2 flex items-start justify-between">
+                          <h3 className="flex-1 text-lg font-semibold text-gray-900">{item.title}</h3>
+                        </div>
+
+                        {/* Category Tag */}
+                        <div className="mb-3 flex flex-wrap gap-2">
+                          <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                            {item.category}
+                          </span>
+                        </div>
+
+                        {/* Info */}
+                        <div className="mb-4 space-y-2 text-sm text-gray-600">
+                          <p className="text-xs text-gray-500">ไม่ได้รับการแลกเปลี่ยน</p>
+                          <div className="flex items-center gap-1">
+                            <Eye size={16} className="text-gray-400" />
+                            <span>{views} views</span>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleManageItem(item)}
+                            disabled={!canEdit}
+                            className="flex-1 rounded-full bg-yellow-100 px-4 py-2 text-sm font-semibold text-yellow-800 transition hover:bg-yellow-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={!canEdit ? 'ไม่สามารถแก้ไขได้ เนื่องจากมีคำขอแลกเปลี่ยนที่ยอมรับแล้ว' : ''}
+                          >
+                            จัดการ
+                          </button>
+                          <button
+                            onClick={() => handleEditItem(item)}
+                            disabled={!canEdit}
+                            className="flex-1 rounded-full bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={!canEdit ? 'ไม่สามารถแก้ไขได้ เนื่องจากมีคำขอแลกเปลี่ยนที่ยอมรับแล้ว' : ''}
                           >
                             แก้ไข
                           </button>

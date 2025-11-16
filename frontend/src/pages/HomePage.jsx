@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Search,
   Handshake,
@@ -14,10 +15,12 @@ import {
   ChevronDown,
   MapPin,
   User as UserIcon,
+  Eye,
 } from 'lucide-react'
 import { itemsApi } from '../lib/api'
 
 export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
+  const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('All Categories')
   const [selectedCondition, setSelectedCondition] = useState('All Conditions')
@@ -26,12 +29,14 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
 
   const categoryOptions = [
     { value: 'All Categories', label: 'All Categories' },
-    { value: 'Books & Textbooks', label: 'Books & Textbooks' },
-    { value: 'Clothes', label: 'Clothes' },
-    { value: 'Electronics', label: 'Electronics' },
-    { value: 'Dorm Items', label: 'Dorm Items' },
-    { value: 'Sports Equipment', label: 'Sports Equipment' },
-    { value: 'Eco Items', label: 'Eco Items' },
+    { value: 'Clothes & Fashion', label: '👕 Clothes & Fashion' },
+    { value: 'Dorm Essentials', label: '🏡 Dorm Essentials' },
+    { value: 'Books & Study', label: '📚 Books & Study' },
+    { value: 'Kitchen & Appliances', label: '🍳 Kitchen & Appliances' },
+    { value: 'Cleaning & Laundry', label: '🧼 Cleaning & Laundry' },
+    { value: 'Hobbies & Entertainment', label: '🎮 Hobbies & Entertainment' },
+    { value: 'Sports Gear', label: '🏀 Sports Gear' },
+    { value: 'Others', label: '✨ Others' },
   ]
 
   const conditionOptions = [
@@ -63,9 +68,11 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
+      const title = item.title || ''
+      const description = item.description || ''
       const matchesQuery =
-        item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (item.description || '').toLowerCase().includes(searchQuery.toLowerCase())
+        title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        description.toLowerCase().includes(searchQuery.toLowerCase())
       const matchesCategory =
         selectedCategory === 'All Categories' || item.category === selectedCategory
       const matchesCondition =
@@ -292,8 +299,13 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
                   {item.category}
                 </div>
                 
-                {/* Title */}
-                <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">{item.title}</h3>
+                {/* Title - Clickable to view details */}
+                <h3 
+                  onClick={() => navigate(`/items/${item.id}`)}
+                  className="cursor-pointer text-lg font-semibold text-gray-900 line-clamp-2 transition hover:text-primary"
+                >
+                  {item.title}
+                </h3>
                 
                 {/* Details: Condition, Location, Seller */}
                 <div className="flex-1 space-y-2.5 text-base text-gray-600">
@@ -313,24 +325,33 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
                   </div>
                 </div>
                 
-                {/* Exchange Button */}
-                {isInProgress ? (
+                {/* Action Buttons */}
+                <div className="mt-auto flex gap-2">
                   <button
-                    disabled
-                    className="mt-auto flex w-full items-center justify-center gap-2 rounded-lg bg-gray-300 px-5 py-3 text-base font-semibold text-gray-500 shadow-md cursor-not-allowed"
+                    onClick={() => navigate(`/items/${item.id}`)}
+                    className="flex-1 rounded-lg border-2 border-primary bg-white px-4 py-2.5 text-sm font-semibold text-primary transition hover:bg-primary/10"
                   >
-                    <RefreshCcw size={20} />
-                    กำลังดำเนินการ
+                    <Eye size={16} className="mx-auto" />
+                    <span className="mt-1 block text-xs">ดูรายละเอียด</span>
                   </button>
-                ) : (
-                  <button
-                    onClick={() => onExchangeItem(item.id)}
-                    className="mt-auto flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-base font-semibold text-white shadow-md transition hover:bg-primary-dark"
-                  >
-                    <RefreshCcw size={20} />
-                    Exchange
-                  </button>
-                )}
+                  {isInProgress ? (
+                    <button
+                      disabled
+                      className="flex-1 rounded-lg bg-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-500 shadow-md cursor-not-allowed"
+                    >
+                      <RefreshCcw size={16} className="mx-auto" />
+                      <span className="mt-1 block text-xs">กำลังดำเนินการ</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => onExchangeItem(item.id)}
+                      className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-primary-dark"
+                    >
+                      <RefreshCcw size={16} className="mx-auto" />
+                      <span className="mt-1 block text-xs">Exchange</span>
+                    </button>
+                  )}
+                </div>
               </div>
             </article>
             )

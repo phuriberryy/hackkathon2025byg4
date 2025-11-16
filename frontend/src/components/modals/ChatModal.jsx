@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { io } from 'socket.io-client'
-import { Send, MessageCircle, Loader2, Check, X, QrCode } from 'lucide-react'
+import { Send, MessageCircle, Loader2, Check, X, QrCode, CheckCheck } from 'lucide-react'
 import Modal from '../ui/Modal'
 import { API_BASE, chatApi } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
@@ -108,6 +108,14 @@ export default function ChatModal({ open, onClose, initialChatId }) {
       if (chat.id === activeChatRef.current) {
         setActiveChatId((current) => current ?? chat.id)
       }
+    })
+
+    socket.on('message:read', ({ messageId, readAt }) => {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId ? { ...msg, read_at: readAt, is_read: true } : msg
+        )
+      )
     })
 
     return () => {
@@ -403,12 +411,12 @@ export default function ChatModal({ open, onClose, initialChatId }) {
               <div className="flex h-[520px] flex-col">
                 <div className="mb-3 flex items-center justify-between gap-2 border-b border-gray-100 pb-2">
                   <div className="flex items-center gap-2">
-                    <MessageCircle size={18} className="text-primary" />
-                    <div>
-                      <p className="text-sm font-semibold">{activeChat.participant_name}</p>
-                      <p className="text-xs text-gray-500">{activeChat.participant_email}</p>
-                    </div>
+                  <MessageCircle size={18} className="text-primary" />
+                  <div>
+                    <p className="text-sm font-semibold">{activeChat.participant_name}</p>
+                    <p className="text-xs text-gray-500">{activeChat.participant_email}</p>
                   </div>
+                </div>
                   {activeChat.itemTitle && (
                     <span className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
                       {activeChat.itemTitle}
@@ -699,22 +707,43 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                   )}
 
                 <div className="flex-1 space-y-2 overflow-y-auto pr-1">
-                  {messages.map((msg) => (
-                    <div
-                      key={msg.id}
-                      className={`flex ${msg.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
-                    >
+                  {messages.map((msg) => {
+                    const isSentByMe = msg.sender_id === user?.id || msg.is_sent_by_me
+                    const isRead = msg.is_read || msg.read_at !== null
+                    
+                    return (
                       <div
-                        className={`max-w-xs rounded-2xl px-4 py-2 text-sm ${
-                          msg.sender_id === user?.id
-                            ? 'bg-primary text-white'
-                            : 'bg-surface text-gray-800'
-                        }`}
+                        key={msg.id}
+                        className={`flex flex-col ${isSentByMe ? 'items-end' : 'items-start'}`}
                       >
-                        {msg.body}
+                        <div
+                          className={`max-w-xs rounded-2xl px-4 py-2 text-sm ${
+                            isSentByMe
+                              ? 'bg-primary text-white'
+                              : 'bg-surface text-gray-800'
+                          }`}
+                        >
+                          {msg.body}
+                        </div>
+                        {/* แสดงสถานะสำหรับข้อความที่ส่งเอง */}
+                        {isSentByMe && (
+                          <div className="mt-1 flex items-center gap-1 px-2">
+                            {isRead ? (
+                              <>
+                                <CheckCheck size={12} className="text-blue-500" />
+                                <span className="text-[10px] text-gray-500">อ่านแล้ว</span>
+                              </>
+                            ) : (
+                              <>
+                                <Check size={12} className="text-gray-400" />
+                                <span className="text-[10px] text-gray-400">ส่งแล้ว</span>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                   <div ref={bottomRef} />
                 </div>
 

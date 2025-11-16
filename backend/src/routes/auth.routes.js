@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { body } from 'express-validator'
-import { login, register } from '../controllers/authController.js'
+import { login, register, forgotPassword, resetPassword } from '../controllers/authController.js'
 
 const router = Router()
 
@@ -22,6 +22,23 @@ router.post(
     body('password').notEmpty(),
   ],
   login
+)
+
+router.post(
+  '/forgot-password',
+  [
+    body('email').isEmail().withMessage('Valid email required'),
+  ],
+  forgotPassword
+)
+
+router.post(
+  '/reset-password',
+  [
+    body('token').notEmpty().withMessage('Token is required'),
+    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  ],
+  resetPassword
 )
 
 export default router

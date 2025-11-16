@@ -62,7 +62,14 @@ export const initChatServer = (server) => {
       )
 
       const message = messageResult.rows[0]
-      io.to(chatId).emit('chat:message', message)
+      // เพิ่มข้อมูลสถานะการอ่าน (ข้อความที่เพิ่งส่งยังไม่อ่าน)
+      const messageWithStatus = {
+        ...message,
+        is_sent_by_me: true,
+        is_read: false,
+        read_at: null
+      }
+      io.to(chatId).emit('chat:message', messageWithStatus)
 
       const recipientId = chat.creator_id === user.id ? chat.participant_id : chat.creator_id
 
@@ -101,4 +108,5 @@ export const initChatServer = (server) => {
 }
 
 export const getChatServer = () => ioInstance
+
 

@@ -4,13 +4,14 @@
 // ค่า CO₂ footprint ต่อ category (kg CO₂e ต่อ 1 item)
 // ข้อมูลจากแหล่งอ้างอิง: Life Cycle Assessment (LCA) studies
 const CO2_BY_CATEGORY = {
-  'Books & Textbooks': 2.5, // หนังสือมี CO₂ footprint ประมาณ 2.5 kg จากการผลิต
-  'Clothes': 15.0, // เสื้อผ้ามี CO₂ footprint สูงจากการผลิตและการขนส่ง
-  'Electronics': 45.0, // อิเล็กทรอนิกส์มี CO₂ footprint สูงมากจากการผลิต
-  'Dorm Items': 8.0, // ของใช้ในหอพัก (เช่น เตียง โต๊ะ) มี CO₂ footprint ปานกลาง
-  'Sports Equipment': 12.0, // อุปกรณ์กีฬามี CO₂ footprint ปานกลาง-สูง
-  'Eco Items': 3.0, // สินค้าที่เป็นมิตรกับสิ่งแวดล้อมมี CO₂ footprint ต่ำ
-  'Other': 5.0, // ค่าเริ่มต้นสำหรับ category อื่นๆ
+  'Clothes & Fashion': 8.0, // เสื้อผ้า, กางเกง, รองเท้า
+  'Dorm Essentials': 10.0, // หม้อหุงข้าว, ราวตากผ้า, ผ้าห่ม
+  'Books & Study': 20.0, // ตำราเรียน, สมุด, ไฟอ่านหนังสือ
+  'Kitchen & Appliances': 15.0, // กระทะ, เขียง, หม้อทอด
+  'Cleaning & Laundry': 6.0, // น้ำยาซักผ้า, ไม้ถูพื้น, ไม้กวาด
+  'Hobbies & Entertainment': 10.0, // บอร์ดเกม, กีตาร์, ของสะสม
+  'Sports Gear': 10.0, // รองเท้ากีฬา, ลูกบอล, เสื่อโยคะ
+  'Others': 5.0, // อื่น ๆ
 }
 
 // Multiplier ตาม condition
@@ -30,7 +31,7 @@ const CONDITION_MULTIPLIER = {
  */
 export function calculateItemCO2(category, condition) {
   // ดึงค่า CO₂ footprint ตาม category
-  const baseCO2 = CO2_BY_CATEGORY[category] || CO2_BY_CATEGORY['Other']
+  const baseCO2 = CO2_BY_CATEGORY[category] || CO2_BY_CATEGORY['Others']
   
   // คำนวณตาม condition
   const multiplier = CONDITION_MULTIPLIER[condition] || CONDITION_MULTIPLIER['Good']
@@ -89,7 +90,7 @@ export function calculateExchangeCO2(item1, item2) {
  * @returns {number} CO₂ footprint ในหน่วย kg CO₂e
  */
 export function getCO2ByCategory(category) {
-  return CO2_BY_CATEGORY[category] || CO2_BY_CATEGORY['Other']
+  return CO2_BY_CATEGORY[category] || CO2_BY_CATEGORY['Others']
 }
 
 /**

@@ -9,7 +9,8 @@ export const getItems = async (_req, res) => {
       `SELECT items.*, users.name as owner_name, users.faculty as owner_faculty
        FROM items
        JOIN users ON items.user_id = users.id
-       WHERE status='active' OR status='in_progress'
+       WHERE (status='active' OR status='in_progress')
+         AND (available_until IS NULL OR available_until >= CURRENT_DATE)
        ORDER BY created_at DESC`
     )
 
