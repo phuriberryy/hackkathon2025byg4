@@ -1,0 +1,527 @@
+{
+  "info": {
+    "_postman_id": "sharecycle-backend-api",
+    "name": "ShareCycle Backend API",
+    "description": "ShareCycle Backend API - Complete API testing collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john.doe@cmu.ac.th\",\n  \"password\": \"password123\",\n  \"faculty\": \"Engineering\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john.doe@cmu.ac.th\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john.doe@cmu.ac.th\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/forgot-password",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "forgot-password"]
+            }
+          }
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"reset_token_here\",\n  \"password\": \"newpassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/reset-password",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "reset-password"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Items",
+      "item": [
+        {
+          "name": "Get All Items",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/items",
+              "host": ["{{base_url}}"],
+              "path": ["api", "items"]
+            }
+          }
+        },
+        {
+          "name": "Get Item By ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/items/{{item_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "items", "{{item_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Mountain Bike\",\n  \"category\": \"sports\",\n  \"itemCondition\": \"good\",\n  \"lookingFor\": \"skateboard\",\n  \"description\": \"Barely used mountain bike\",\n  \"availableUntil\": \"2025-12-31T23:59:59Z\",\n  \"imageUrl\": \"https://example.com/bike.jpg\",\n  \"pickupLocation\": \"CMU Campus\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/items",
+              "host": ["{{base_url}}"],
+              "path": ["api", "items"]
+            }
+          }
+        },
+        {
+          "name": "Update Item",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Mountain Bike - Updated\",\n  \"description\": \"Rarely used mountain bike\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/items/{{item_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "items", "{{item_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Item",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/items/{{item_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "items", "{{item_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get User's Items",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/items/user/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "items", "user", "{{user_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Item Exchange Requests",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/items/{{item_id}}/exchange-requests",
+              "host": ["{{base_url}}"],
+              "path": ["api", "items", "{{item_id}}", "exchange-requests"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Exchange",
+      "item": [
+        {
+          "name": "Create Exchange Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"itemId\": \"{{item_id}}\",\n  \"message\": \"I'm interested in your bike!\",\n  \"requesterItemName\": \"Skateboard\",\n  \"requesterItemCategory\": \"sports\",\n  \"requesterItemCondition\": \"like-new\",\n  \"requesterItemDescription\": \"Brand new skateboard\",\n  \"requesterItemImageUrl\": \"https://example.com/skateboard.jpg\",\n  \"requesterPickupLocation\": \"CMU Campus\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/exchange",
+              "host": ["{{base_url}}"],
+              "path": ["api", "exchange"]
+            }
+          }
+        },
+        {
+          "name": "Get My Exchange Requests",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/exchange/my-requests",
+              "host": ["{{base_url}}"],
+              "path": ["api", "exchange", "my-requests"]
+            }
+          }
+        },
+        {
+          "name": "Get Exchange Request Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/exchange/{{request_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "exchange", "{{request_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Accept Exchange by Owner",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/exchange/{{request_id}}/accept-owner",
+              "host": ["{{base_url}}"],
+              "path": ["api", "exchange", "{{request_id}}", "accept-owner"]
+            }
+          }
+        },
+        {
+          "name": "Accept Exchange by Requester",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/exchange/{{request_id}}/accept-requester",
+              "host": ["{{base_url}}"],
+              "path": ["api", "exchange", "{{request_id}}", "accept-requester"]
+            }
+          }
+        },
+        {
+          "name": "Reject Exchange Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/exchange/{{request_id}}/reject",
+              "host": ["{{base_url}}"],
+              "path": ["api", "exchange", "{{request_id}}", "reject"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chat",
+      "item": [
+        {
+          "name": "Get All Chats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/chats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "chats"]
+            }
+          }
+        },
+        {
+          "name": "Create Chat",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"participantId\": \"{{participant_id}}\",\n  \"itemId\": \"{{item_id}}\",\n  \"exchangeRequestId\": \"{{request_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/chats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "chats"]
+            }
+          }
+        },
+        {
+          "name": "Create Chat with Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"participantEmail\": \"john@cmu.ac.th\",\n  \"itemId\": \"{{item_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/chats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "chats"]
+            }
+          }
+        },
+        {
+          "name": "Get Chat Messages",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/chats/{{chat_id}}/messages",
+              "host": ["{{base_url}}"],
+              "path": ["api", "chats", "{{chat_id}}", "messages"]
+            }
+          }
+        },
+        {
+          "name": "Accept Chat",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/chats/{{chat_id}}/accept",
+              "host": ["{{base_url}}"],
+              "path": ["api", "chats", "{{chat_id}}", "accept"]
+            }
+          }
+        },
+        {
+          "name": "Decline Chat",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/chats/{{chat_id}}/decline",
+              "host": ["{{base_url}}"],
+              "path": ["api", "chats", "{{chat_id}}", "decline"]
+            }
+          }
+        },
+        {
+          "name": "Confirm Chat with QR",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"QR_CODE_VALUE\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/chats/{{chat_id}}/confirm",
+              "host": ["{{base_url}}"],
+              "path": ["api", "chats", "{{chat_id}}", "confirm"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:4000",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "item_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "request_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "chat_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "participant_id",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
