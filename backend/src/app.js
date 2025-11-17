@@ -13,7 +13,20 @@ import statisticsRoutes from './routes/statistics.routes.js'
 
 const app = express()
 
-app.use(cors({ origin: env.clientOrigin, credentials: true }))
+app.use(cors({ 
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true)
+    
+    // Check if origin is in allowed list
+    if (env.allowedOrigins.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(new Error('Not allowed by CORS'))
+    }
+  },
+  credentials: true 
+}))
 app.use(express.json({ limit: '10mb' }))
 app.use(cookieParser())
 

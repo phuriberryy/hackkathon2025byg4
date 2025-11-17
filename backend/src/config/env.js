@@ -18,6 +18,7 @@ if (result.error) {
 const schema = z.object({
   PORT: z.coerce.number().default(4000),
   CLIENT_ORIGIN: z.string().url(),
+  CLIENT_ORIGINS: z.string().optional(), // Comma-separated list of allowed origins
   DATABASE_URL: z.string().min(1),
   JWT_SECRET: z.string().min(16),
   EMAIL_HOST: z.string().min(1).optional(),
@@ -30,9 +31,15 @@ const schema = z.object({
 
 const parsed = schema.parse(process.env)
 
+// Parse allowed origins - support both single origin and comma-separated list
+const allowedOrigins = parsed.CLIENT_ORIGINS
+  ? parsed.CLIENT_ORIGINS.split(',').map(origin => origin.trim())
+  : [parsed.CLIENT_ORIGIN]
+
 const env = {
   port: parsed.PORT,
   clientOrigin: parsed.CLIENT_ORIGIN,
+  allowedOrigins,
   databaseUrl: parsed.DATABASE_URL,
   jwtSecret: parsed.JWT_SECRET,
   // Email config - ถ้าไม่ตั้งค่า จะใช้ MOCK MODE (แค่ log ใน console)
