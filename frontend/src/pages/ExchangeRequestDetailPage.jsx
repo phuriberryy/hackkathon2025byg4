@@ -74,10 +74,6 @@ export default function ExchangeRequestDetailPage() {
       // Use data from response directly (if available) or refresh
       let updatedData = response?.exchangeRequest || response
       
-      // Check if both parties have accepted from response
-      const bothAcceptedFromResponse = response?.bothAccepted
-      const statusFromResponse = response?.status
-      
       if (!updatedData || !updatedData.id) {
       // Refresh data
         updatedData = await exchangeApi.getById(token, requestId)
