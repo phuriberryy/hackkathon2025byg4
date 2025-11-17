@@ -204,7 +204,15 @@ export default function ItemDetailPage({ onExchangeItem }) {
                 </span>
               )}
             </div>
-            <h1 className="mb-2 text-3xl font-bold text-gray-900">{item.title || 'No item name'}</h1>
+            <h1 className="mb-4 text-3xl font-bold text-gray-900">{item.title || 'No item name'}</h1>
+            
+            {/* Description */}
+            {item.description && (
+              <div className="mb-6 rounded-xl bg-gray-50 p-4">
+                <p className="mb-2 text-sm font-semibold text-gray-700">Description</p>
+                <p className="text-sm leading-relaxed text-gray-700 whitespace-pre-wrap">{item.description}</p>
+              </div>
+            )}
           </div>
 
           {/* Details Grid */}
@@ -229,14 +237,6 @@ export default function ItemDetailPage({ onExchangeItem }) {
                 <p className="text-sm font-medium text-gray-700">{item.owner_email || 'Not specified'}</p>
               </div>
             </div>
-
-            {/* Description */}
-            {item.description && (
-              <div className="rounded-xl bg-gray-50 p-4">
-                <p className="mb-2 text-xs text-gray-500">Description</p>
-                <p className="text-sm text-gray-700">{item.description}</p>
-              </div>
-            )}
 
             {/* Pickup Location */}
             <div className="flex items-center gap-3 rounded-xl bg-gray-50 p-4">
