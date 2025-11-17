@@ -179,6 +179,60 @@ hackkathon2025byg4/
 
 See `.env.example` files in `backend/` and `frontend/` directories for required environment variables.
 
+## Deployment to GitHub Pages
+
+The frontend can be deployed to GitHub Pages at `https://CMU-ShareCycle.github.io`.
+
+### Prerequisites
+
+1. Create a GitHub repository named `CMU-ShareCycle.github.io` (must match exactly)
+2. Push your code to the repository
+3. Enable GitHub Pages in repository settings:
+   - Go to Settings → Pages
+   - Source: Select "GitHub Actions"
+
+### Automatic Deployment (Recommended)
+
+The project includes a GitHub Actions workflow that automatically deploys on push to `main` or `master` branch.
+
+1. Push your code to GitHub:
+   ```bash
+   git add .
+   git commit -m "Setup GitHub Pages deployment"
+   git push origin main
+   ```
+
+2. The workflow will automatically:
+   - Build the React app
+   - Deploy to GitHub Pages
+   - Make it available at `https://CMU-ShareCycle.github.io`
+
+### Manual Deployment
+
+You can also deploy manually using the `gh-pages` package:
+
+```bash
+cd frontend
+npm install
+npm run deploy
+```
+
+### Environment Variables for Production
+
+If you need to set environment variables for the deployed site:
+
+1. Go to your GitHub repository
+2. Navigate to Settings → Secrets and variables → Actions
+3. Add a new secret named `REACT_APP_API_URL` with your production API URL
+
+The workflow will automatically use this value during build.
+
+### Important Notes
+
+- The backend API must be accessible from the deployed frontend
+- Update `REACT_APP_API_URL` to point to your production backend
+- GitHub Pages only hosts static files, so the backend must be deployed separately (e.g., Heroku, Railway, Render, etc.)
+
 ## License
 
 This project is part of a hackathon submission.
