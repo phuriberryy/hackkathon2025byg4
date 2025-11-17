@@ -86,6 +86,10 @@ export default function ChatModal({ open, onClose, initialChatId }) {
     socket.on('connect_error', (err) => {
       console.error('Socket error', err)
     })
+    
+    socket.on('chat:error', ({ message }) => {
+      alert(message || 'ไม่สามารถส่งข้อความได้')
+    })
 
     socket.on('chat:message', (message) => {
       setMessages((prev) =>

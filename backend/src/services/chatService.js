@@ -43,13 +43,26 @@ export const initChatServer = (server) => {
       if (!body || !chatId) return
 
       const membership = await query(
-        `SELECT * FROM chats WHERE id=$1 AND (creator_id=$2 OR participant_id=$2)`,
+        `SELECT c.*, er.exchange_request_id, er.owner_accepted, er.requester_accepted
+         FROM chats c
+         LEFT JOIN exchange_requests er ON c.exchange_request_id = er.id
+         WHERE c.id=$1 AND (c.creator_id=$2 OR c.participant_id=$2)`,
         [chatId, user.id]
       )
 
       if (!membership.rowCount) return
-
+      
       const chat = membership.rows[0]
+      
+      // สำหรับ exchange chat ต้องทั้งสองฝ่ายยอมรับแล้วถึงจะส่งข้อความได้
+      if (chat.exchange_request_id) {
+        const bothAccepted = chat.owner_accepted && chat.requester_accepted
+        if (!bothAccepted) {
+          socket.emit('chat:error', { message: 'กรุณารอให้ทั้งสองฝ่ายยอมรับก่อนส่งข้อความ' })
+          return
+        }
+      }
+      
       if (chat.status !== 'active') {
         return
       }

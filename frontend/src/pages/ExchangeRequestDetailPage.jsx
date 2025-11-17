@@ -9,6 +9,7 @@ import {
   User,
   ArrowLeft,
   Package,
+  MapPin,
 } from 'lucide-react'
 import { exchangeApi, chatApi } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
@@ -44,6 +45,7 @@ export default function ExchangeRequestDetailPage() {
         console.log('  Image URL preview:', data.item_image_url?.substring(0, 100))
         console.log('  Category:', data.item_category)
         console.log('  Condition:', data.item_condition)
+        console.log('  Pickup Location:', data.item_pickup_location)
         console.log('  Item ID:', data.item_id)
         console.log('--- Requester Item (ฝั่งขวา - ควรเป็นรูปเสื้อสีดำ) ---')
         console.log('  Name:', data.requester_item_name)
@@ -118,15 +120,7 @@ export default function ExchangeRequestDetailPage() {
         : (updatedData.owner_accepted && updatedData.requester_accepted)
       const isChatting = statusFromResponse === 'chatting' || updatedData.status === 'chatting'
       
-      if (isChatting || bothAccepted) {
-        // เมื่อทั้งสองฝ่าย accept แล้ว ให้ redirect กลับไปหน้า home
-        setTimeout(() => {
-          alert('ยอมรับคำขอแลกเปลี่ยนสำเร็จ! คุณสามารถเริ่มแชทได้ที่หน้า Home')
-          navigate('/', { replace: true })
-        }, 100)
-      } else {
-      alert('ยอมรับคำขอแลกเปลี่ยนสำเร็จ')
-      }
+      // ไม่ต้องแสดง alert หรือ redirect - ให้ผู้ใช้กดปุ่ม "เริ่มแชท" ได้เลย
     } catch (err) {
       console.error('Failed to accept exchange:', err)
       // ถ้า error แต่ status อาจอัปเดตแล้ว ให้ refresh ข้อมูลอีกครั้ง
@@ -137,11 +131,7 @@ export default function ExchangeRequestDetailPage() {
         
         if (isChatting || bothAccepted) {
           setExchangeRequest(data)
-          // เมื่อทั้งสองฝ่าย accept แล้ว ให้ redirect กลับไปหน้า home
-          setTimeout(() => {
-            alert('ยอมรับคำขอแลกเปลี่ยนสำเร็จ! คุณสามารถเริ่มแชทได้ที่หน้า Home')
-            navigate('/', { replace: true })
-          }, 100)
+          // ไม่ต้องแสดง alert หรือ redirect - ให้ผู้ใช้กดปุ่ม "เริ่มแชท" ได้เลย
         } else {
           alert('ยอมรับคำขอแลกเปลี่ยนไม่สำเร็จ: ' + (err.message || 'Unknown error'))
         }
@@ -388,9 +378,19 @@ export default function ExchangeRequestDetailPage() {
                 </div>
               )}
             </div>
-            <h3 className="mb-2 font-semibold text-gray-900">
-              {exchangeRequest.item_title || 'ไม่มีชื่อสินค้า'}
-            </h3>
+            <div className="mb-2">
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="font-semibold text-gray-900">
+                  {exchangeRequest.item_title || 'ไม่มีชื่อสินค้า'}
+                </h3>
+                {exchangeRequest.item_pickup_location && (
+                  <div className="flex items-center gap-1 text-xs text-gray-600 whitespace-nowrap">
+                    <MapPin size={14} className="text-gray-400 flex-shrink-0" />
+                    <span>{exchangeRequest.item_pickup_location}</span>
+                  </div>
+                )}
+              </div>
+            </div>
             <div className="flex flex-wrap gap-2">
               {exchangeRequest.item_category && (
               <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-gray-700">

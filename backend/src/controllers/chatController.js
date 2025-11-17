@@ -717,7 +717,9 @@ function mapChatRow(row, currentUserId) {
   const role = resolveChatRole(row, currentUserId)
   const status = row.status || 'pending'
   const isExchangeChat = Boolean(row.exchange_request_id)
-  const canSendMessages = status !== 'declined' && !row.closed_at
+  // สำหรับ exchange chat ต้องทั้งสองฝ่ายยอมรับแล้วถึงจะแชทได้
+  const bothAccepted = row.owner_accepted && row.requester_accepted
+  const canSendMessages = status !== 'declined' && !row.closed_at && (!isExchangeChat || bothAccepted)
 
   return {
     id: row.id,
