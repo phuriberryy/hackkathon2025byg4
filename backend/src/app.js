@@ -9,6 +9,7 @@ import notificationRoutes from './routes/notification.routes.js'
 import chatRoutes from './routes/chat.routes.js'
 import profileRoutes from './routes/profile.routes.js'
 import emailRoutes from './routes/email.routes.js'
+import statisticsRoutes from './routes/statistics.routes.js'
 
 const app = express()
 
@@ -25,6 +26,7 @@ app.use('/api/notifications', notificationRoutes)
 app.use('/api/chats', chatRoutes)
 app.use('/api/profile', profileRoutes)
 app.use('/api/email', emailRoutes)
+app.use('/api/statistics', statisticsRoutes)
 
 app.use((err, _req, res, _next) => {
   console.error(err)

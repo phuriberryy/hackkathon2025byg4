@@ -719,7 +719,8 @@ function mapChatRow(row, currentUserId) {
   const isExchangeChat = Boolean(row.exchange_request_id)
   // สำหรับ exchange chat ต้องทั้งสองฝ่ายยอมรับแล้วถึงจะแชทได้
   const bothAccepted = row.owner_accepted && row.requester_accepted
-  const canSendMessages = status !== 'declined' && !row.closed_at && (!isExchangeChat || bothAccepted)
+  // หลังจากยืนยัน QR แล้วไม่สามารถส่งข้อความได้อีก
+  const canSendMessages = status !== 'declined' && !row.closed_at && !row.qr_confirmed && (!isExchangeChat || bothAccepted)
 
   return {
     id: row.id,

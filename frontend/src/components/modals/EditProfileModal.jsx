@@ -56,7 +56,7 @@ export default function EditProfileModal({ isOpen, onClose, user, onUpdate }) {
       await onUpdate(form)
       onClose()
     } catch (err) {
-      setError(err.message || 'ไม่สามารถอัปเดตโปรไฟล์ได้')
+      setError(err.message || 'Failed to update profile')
     } finally {
       setSubmitting(false)
     }
@@ -76,14 +76,14 @@ export default function EditProfileModal({ isOpen, onClose, user, onUpdate }) {
         </button>
 
         {/* Header */}
-        <h2 className="mb-6 text-2xl font-bold text-gray-900">แก้ไขโปรไฟล์</h2>
+        <h2 className="mb-6 text-2xl font-bold text-gray-900">Edit Profile</h2>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Name */}
           <div>
             <label className="mb-2 block text-sm font-semibold text-gray-900">
-              ชื่อ-นามสกุล
+              Full Name
             </label>
             <div className="relative">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
@@ -94,7 +94,7 @@ export default function EditProfileModal({ isOpen, onClose, user, onUpdate }) {
                 name="name"
                 value={form.name}
                 onChange={handleChange}
-                placeholder="ชื่อจริง"
+                placeholder="Your name"
                 className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 pl-10 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-0"
                 required
               />
@@ -104,7 +104,7 @@ export default function EditProfileModal({ isOpen, onClose, user, onUpdate }) {
           {/* Faculty */}
           <div>
             <label className="mb-2 block text-sm font-semibold text-gray-900">
-              คณะ/หน่วยงาน
+              Faculty/Department
             </label>
             <div className="relative">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
@@ -116,7 +116,7 @@ export default function EditProfileModal({ isOpen, onClose, user, onUpdate }) {
                 onChange={handleChange}
                 className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-3 pl-10 pr-10 text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-0"
               >
-                <option value="">เลือกคณะ/หน่วยงาน</option>
+                <option value="">Select Faculty/Department</option>
                 {faculties.map((faculty) => (
                   <option key={faculty} value={faculty}>
                     {faculty}
@@ -136,14 +136,14 @@ export default function EditProfileModal({ isOpen, onClose, user, onUpdate }) {
               onClick={onClose}
               className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
             >
-              ยกเลิก
+              Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
               className="flex-1 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-primary-dark disabled:opacity-60"
             >
-              {submitting ? 'กำลังบันทึก...' : 'บันทึก'}
+              {submitting ? 'Saving...' : 'Save'}
             </button>
           </div>
         </form>

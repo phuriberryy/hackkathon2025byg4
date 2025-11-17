@@ -52,7 +52,7 @@ export default function EditItemModal({ open, onClose, item, onSuccess }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!token || !item) {
-      alert('กรุณาเข้าสู่ระบบก่อนแก้ไขโพสต์')
+      alert('Please log in before editing post')
       return
     }
     setSubmitting(true)
@@ -70,7 +70,7 @@ export default function EditItemModal({ open, onClose, item, onSuccess }) {
       onSuccess?.()
       onClose()
     } catch (err) {
-      alert(err.message || 'ไม่สามารถแก้ไขโพสต์ได้')
+      alert(err.message || 'Failed to edit post')
     } finally {
       setSubmitting(false)
     }
@@ -101,8 +101,8 @@ export default function EditItemModal({ open, onClose, item, onSuccess }) {
     <Modal
       open={open}
       onClose={onClose}
-      title="แก้ไขโพสต์"
-      subtitle="แก้ไขข้อมูลของที่คุณโพสต์"
+      title="Edit Post"
+      subtitle="Edit your posted item information"
       size="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -215,7 +215,7 @@ export default function EditItemModal({ open, onClose, item, onSuccess }) {
         {/* Expiration Date */}
         <div>
           <label className="mb-2 block text-sm font-bold text-gray-900">
-            วันหมดอายุของโพสต์ <span className="text-red-500">*</span>
+            Post Expiration Date <span className="text-red-500">*</span>
           </label>
           <input
             type="date"
@@ -273,7 +273,7 @@ export default function EditItemModal({ open, onClose, item, onSuccess }) {
             disabled={submitting}
             className="rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white shadow-md hover:bg-primary-dark transition disabled:opacity-60"
           >
-            {submitting ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
+            {submitting ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
       </form>

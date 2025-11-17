@@ -86,15 +86,15 @@ export default function NotificationsModal({ open, onClose, onUnreadChange }) {
     const hours = Math.floor(diff / 3600000)
     const days = Math.floor(diff / 86400000)
 
-    if (minutes < 1) return 'เมื่อสักครู่'
-    if (minutes < 60) return `${minutes} นาทีที่แล้ว`
-    if (hours < 24) return `${hours} ชั่วโมงที่แล้ว`
-    return `${days} วันที่แล้ว`
+    if (minutes < 1) return 'Just now'
+    if (minutes < 60) return `${minutes} minutes ago`
+    if (hours < 24) return `${hours} hours ago`
+    return `${days} days ago`
   }
 
   const getNotificationIcon = (type, title) => {
-    // ตรวจสอบว่าเป็นข้อความใหม่หรือไม่
-    if (title === 'ข้อความใหม่' || type === 'message' || type === 'chat_message') {
+    // Check if it's a new message (support both Thai and English)
+    if (title === 'New message' || title === 'ข้อความใหม่' || type === 'message' || type === 'chat_message') {
       return <MessageCircle size={20} className="text-primary" />
     }
     
@@ -113,25 +113,29 @@ export default function NotificationsModal({ open, onClose, onUnreadChange }) {
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="การแจ้งเตือน" size="xl">
+    <Modal open={open} onClose={onClose} title="Notifications" size="xl">
       {!token ? (
         <div className="rounded-2xl bg-white p-12 text-center shadow-md">
-          <p className="text-sm text-gray-500">กรุณาเข้าสู่ระบบเพื่อดูการแจ้งเตือน</p>
+          <p className="text-sm text-gray-500">Please log in to view notifications</p>
         </div>
       ) : (
         <div className="space-y-4">
-          {loading && <p className="text-sm text-gray-500">กำลังโหลด...</p>}
+          {loading && <p className="text-sm text-gray-500">Loading...</p>}
           {!loading && notifications.length === 0 && (
             <div className="rounded-2xl bg-white p-12 text-center shadow-md">
-              <p className="text-lg text-gray-600">ไม่มีการแจ้งเตือน</p>
-              <p className="mt-2 text-sm text-gray-500">การแจ้งเตือนจะปรากฏที่นี่!</p>
+              <p className="text-lg text-gray-600">No notifications</p>
+              <p className="mt-2 text-sm text-gray-500">Notifications will appear here!</p>
             </div>
           )}
           {!loading &&
             notifications.map((notification) => {
               const isExchangeRequest = notification.type === 'exchange_request' || notification.type === 'exchange_accepted'
               const isCompleted = notification.type === 'exchange_completed'
-              const isMessage = notification.title === 'ข้อความใหม่' || notification.type === 'message' || notification.type === 'chat_message'
+              // Check for message notifications (support both Thai and English titles)
+              const isMessage = notification.title === 'New message' || 
+                               notification.title === 'ข้อความใหม่' || 
+                               notification.type === 'message' || 
+                               notification.type === 'chat_message'
               const metadata = notification.metadata || {}
               const chatId = metadata.chatId || metadata.chat_id
 
@@ -177,13 +181,13 @@ export default function NotificationsModal({ open, onClose, onUnreadChange }) {
                       </div>
                       {(isExchangeRequest || isCompleted) && (
                         <div className="mt-3 flex items-center gap-2 text-sm text-primary">
-                          <span>ดูรายละเอียด</span>
+                          <span>View Details</span>
                           <ArrowRight size={16} />
                         </div>
                       )}
                       {isMessage && chatId && (
                         <div className="mt-3 flex items-center gap-2 text-sm text-primary">
-                          <span>เปิดแชท</span>
+                          <span>Open Chat</span>
                           <ArrowRight size={16} />
                         </div>
                       )}

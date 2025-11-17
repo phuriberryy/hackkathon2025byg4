@@ -35,40 +35,13 @@ export default function ExchangeRequestDetailPage() {
       try {
         setLoading(true)
         const data = await exchangeApi.getById(token, requestId)
-        console.log('=== Exchange Request Data (Frontend) ===')
-        console.log('Request ID:', requestId)
-        console.log('Full data object:', data)
-        console.log('--- Owner Item (ฝั่งซ้าย - ควรเป็นรูปเก้าอี้) ---')
-        console.log('  Title:', data.item_title)
-        console.log('  Image URL:', data.item_image_url)
-        console.log('  Image URL length:', data.item_image_url?.length)
-        console.log('  Image URL preview:', data.item_image_url?.substring(0, 100))
-        console.log('  Category:', data.item_category)
-        console.log('  Condition:', data.item_condition)
-        console.log('  Pickup Location:', data.item_pickup_location)
-        console.log('  Item ID:', data.item_id)
-        console.log('--- Requester Item (ฝั่งขวา - ควรเป็นรูปเสื้อสีดำ) ---')
-        console.log('  Name:', data.requester_item_name)
-        console.log('  Image URL:', data.requester_item_image_url)
-        console.log('  Image URL length:', data.requester_item_image_url?.length)
-        console.log('  Image URL preview:', data.requester_item_image_url?.substring(0, 100))
-        console.log('  Category:', data.requester_item_category)
-        console.log('  Condition:', data.requester_item_condition)
-        console.log('--- User Info ---')
-        console.log('  User role:', data.user_role)
-        console.log('  Owner name:', data.owner_name)
-        console.log('  Requester name:', data.requester_name)
-        console.log('  Created at:', data.created_at)
-        console.log('--- Verification ---')
-        console.log('  Are URLs different?', data.item_image_url !== data.requester_item_image_url)
-        console.log('========================================')
         setExchangeRequest(data)
         setError(null)
         // Reset image errors when new data is loaded
         setImageErrors({ owner: false, requester: false })
       } catch (err) {
         console.error('Failed to fetch exchange request:', err)
-        setError(err.message || 'ไม่พบคำขอแลกเปลี่ยน')
+        setError(err.message || 'Exchange request not found')
       } finally {
         setLoading(false)
       }
@@ -83,26 +56,26 @@ export default function ExchangeRequestDetailPage() {
     try {
       setProcessing(true)
       
-      // ตรวจสอบว่า user เป็น owner หรือ requester โดยดูจากข้อมูลที่ได้มา
+      // Check if user is owner or requester based on the data
       const isOwner = exchangeRequest.user_role === 'owner'
       
       let response
       if (isOwner) {
         response = await exchangeApi.acceptByOwner(token, requestId)
       } else {
-        // ตรวจสอบว่า owner accept แล้วหรือยังก่อนที่จะให้ requester accept
+        // Check if owner has accepted before allowing requester to accept
         if (!exchangeRequest.owner_accepted) {
-          alert('กรุณารอให้เจ้าของโพสต์ยอมรับคำขอแลกเปลี่ยนก่อน')
+          alert('Please wait for the post owner to accept the exchange request first')
           setProcessing(false)
           return
         }
         response = await exchangeApi.acceptByRequester(token, requestId)
       }
       
-      // ใช้ข้อมูลจาก response โดยตรง (ถ้ามี) หรือ refresh ใหม่
+      // Use data from response directly (if available) or refresh
       let updatedData = response?.exchangeRequest || response
       
-      // ตรวจสอบว่าทั้งสองฝ่าย accept แล้วหรือไม่จาก response
+      // Check if both parties have accepted from response
       const bothAcceptedFromResponse = response?.bothAccepted
       const statusFromResponse = response?.status
       
@@ -111,19 +84,19 @@ export default function ExchangeRequestDetailPage() {
         updatedData = await exchangeApi.getById(token, requestId)
       }
       
-      // อัปเดต state
+      // Update state
       setExchangeRequest(updatedData)
       
-      // ตรวจสอบว่าทั้งสองฝ่ายยอมรับแล้วหรือไม่ (status เป็น 'chatting' หรือทั้งสองฝ่าย accept แล้ว)
+      // Check if both parties have accepted (status is 'chatting' or both parties accepted)
       const bothAccepted = bothAcceptedFromResponse !== undefined 
         ? bothAcceptedFromResponse 
         : (updatedData.owner_accepted && updatedData.requester_accepted)
       const isChatting = statusFromResponse === 'chatting' || updatedData.status === 'chatting'
       
-      // ไม่ต้องแสดง alert หรือ redirect - ให้ผู้ใช้กดปุ่ม "เริ่มแชท" ได้เลย
+      // Don't show alert or redirect - let user click "Start Chat" button
     } catch (err) {
       console.error('Failed to accept exchange:', err)
-      // ถ้า error แต่ status อาจอัปเดตแล้ว ให้ refresh ข้อมูลอีกครั้ง
+      // If error but status may have been updated, refresh data again
       try {
         const data = await exchangeApi.getById(token, requestId)
         const bothAccepted = data.owner_accepted && data.requester_accepted
@@ -131,12 +104,12 @@ export default function ExchangeRequestDetailPage() {
         
         if (isChatting || bothAccepted) {
           setExchangeRequest(data)
-          // ไม่ต้องแสดง alert หรือ redirect - ให้ผู้ใช้กดปุ่ม "เริ่มแชท" ได้เลย
+          // Don't show alert or redirect - let user click "Start Chat" button
         } else {
-          alert('ยอมรับคำขอแลกเปลี่ยนไม่สำเร็จ: ' + (err.message || 'Unknown error'))
+          alert('Failed to accept exchange request: ' + (err.message || 'Unknown error'))
         }
       } catch (refreshErr) {
-      alert('ยอมรับคำขอแลกเปลี่ยนไม่สำเร็จ: ' + (err.message || 'Unknown error'))
+      alert('Failed to accept exchange request: ' + (err.message || 'Unknown error'))
       }
     } finally {
       setProcessing(false)
@@ -146,18 +119,18 @@ export default function ExchangeRequestDetailPage() {
   const handleReject = async () => {
     if (!token || processing || !exchangeRequest) return
 
-    if (!window.confirm('คุณแน่ใจหรือไม่ว่าต้องการปฏิเสธคำขอแลกเปลี่ยนนี้?')) {
+    if (!window.confirm('Are you sure you want to reject this exchange request?')) {
       return
     }
 
     try {
       setProcessing(true)
       await exchangeApi.reject(token, requestId)
-      alert('ปฏิเสธคำขอแลกเปลี่ยนสำเร็จ')
+      alert('Exchange request rejected successfully')
       navigate('/profile')
     } catch (err) {
       console.error('Failed to reject exchange:', err)
-      alert('ปฏิเสธคำขอแลกเปลี่ยนไม่สำเร็จ: ' + (err.message || 'Unknown error'))
+      alert('Failed to reject exchange request: ' + (err.message || 'Unknown error'))
     } finally {
       setProcessing(false)
     }
@@ -167,11 +140,11 @@ export default function ExchangeRequestDetailPage() {
     if (!token || !exchangeRequest) return
 
     try {
-      // ดึง chat ที่เกี่ยวข้องกับ exchange request
+      // Fetch chat related to exchange request
       const chats = await chatApi.list(token)
       const chat = chats.find((c) => {
-        // ตรวจสอบว่า chat นี้เกี่ยวข้องกับ exchange request นี้หรือไม่
-        // โดยดูจาก item_id หรือ exchange_request_id
+        // Check if this chat is related to this exchange request
+        // By checking item_id or exchange_request_id
         return c.item_id === exchangeRequest.item_id || 
                c.exchange_request_id === requestId ||
                (c.creator_id === exchangeRequest.owner_id && c.participant_id === exchangeRequest.requester_id) ||
@@ -181,7 +154,7 @@ export default function ExchangeRequestDetailPage() {
       let chatId = chat?.id
 
       if (!chatId) {
-        // ถ้ายังไม่มี chat ให้สร้างใหม่
+        // If no chat exists, create a new one
         const isOwner = exchangeRequest.user_role === 'owner'
         const otherUserId = isOwner ? exchangeRequest.requester_id : exchangeRequest.owner_id
         const newChat = await chatApi.create(token, {
@@ -191,42 +164,42 @@ export default function ExchangeRequestDetailPage() {
         chatId = newChat.id
       }
 
-      // Dispatch event เพื่อเปิด ChatModal
+      // Dispatch event to open ChatModal
       if (chatId) {
         window.dispatchEvent(new CustomEvent('openChat', { detail: { chatId } }))
       }
     } catch (err) {
       console.error('Failed to start chat:', err)
-      alert('ไม่สามารถเปิดแชทได้: ' + (err.message || 'Unknown error'))
+      alert('Failed to start chat: ' + (err.message || 'Unknown error'))
     }
   }
 
   const formatTimeAgo = (date) => {
-    if (!date) return 'ไม่ทราบเวลา'
+    if (!date) return 'Unknown time'
     const now = new Date()
     const dateObj = new Date(date)
-    if (isNaN(dateObj.getTime())) return 'ไม่ทราบเวลา'
+    if (isNaN(dateObj.getTime())) return 'Unknown time'
     const diff = now - dateObj
-    if (isNaN(diff)) return 'ไม่ทราบเวลา'
+    if (isNaN(diff)) return 'Unknown time'
     const minutes = Math.floor(diff / 60000)
     const hours = Math.floor(diff / 3600000)
     const days = Math.floor(diff / 86400000)
 
-    if (minutes < 1) return 'เมื่อสักครู่'
-    if (minutes < 60) return `${minutes} นาทีที่แล้ว`
-    if (hours < 24) return `${hours} ชั่วโมงที่แล้ว`
-    return `${days} วันที่แล้ว`
+    if (minutes < 1) return 'Just now'
+    if (minutes < 60) return `${minutes} minutes ago`
+    if (hours < 24) return `${hours} hours ago`
+    return `${days} days ago`
   }
 
   const getStatusLabel = () => {
-    if (!exchangeRequest) return 'รอการตอบรับ'
-    if (exchangeRequest.status === 'completed') return 'แลกเปลี่ยนสำเร็จ'
-    if (exchangeRequest.status === 'in_progress') return 'กำลังดำเนินการ'
-    if (exchangeRequest.status === 'chatting') return 'พร้อมแชท'
-    if (exchangeRequest.status === 'rejected') return 'ปฏิเสธแล้ว'
-    if (exchangeRequest.owner_accepted && exchangeRequest.requester_accepted) return 'พร้อมแชท'
-    if (exchangeRequest.owner_accepted || exchangeRequest.requester_accepted) return 'รอการตอบรับ'
-    return 'รอการตอบรับ'
+    if (!exchangeRequest) return 'Waiting for response'
+    if (exchangeRequest.status === 'completed') return 'Exchange completed'
+    if (exchangeRequest.status === 'in_progress') return 'In progress'
+    if (exchangeRequest.status === 'chatting') return 'Ready to chat'
+    if (exchangeRequest.status === 'rejected') return 'Rejected'
+    if (exchangeRequest.owner_accepted && exchangeRequest.requester_accepted) return 'Ready to chat'
+    if (exchangeRequest.owner_accepted || exchangeRequest.requester_accepted) return 'Waiting for response'
+    return 'Waiting for response'
   }
 
   const getStatusColor = () => {
@@ -242,7 +215,7 @@ export default function ExchangeRequestDetailPage() {
   if (loading) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-16 text-center">
-        <p className="text-lg text-gray-600">กำลังโหลด...</p>
+        <p className="text-lg text-gray-600">Loading...</p>
       </div>
     )
   }
@@ -250,12 +223,12 @@ export default function ExchangeRequestDetailPage() {
   if (error || !exchangeRequest) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-16 text-center">
-        <p className="text-lg text-red-600">{error || 'ไม่พบคำขอแลกเปลี่ยน'}</p>
+        <p className="text-lg text-red-600">{error || 'Exchange request not found'}</p>
         <button
           onClick={() => navigate('/')}
           className="mt-4 rounded-full bg-primary px-6 py-3 text-white"
         >
-          กลับหน้าหลัก
+          Back to Home
         </button>
       </div>
     )
@@ -263,15 +236,20 @@ export default function ExchangeRequestDetailPage() {
 
   const isOwner = exchangeRequest.user_role === 'owner'
   const otherUserName = isOwner ? exchangeRequest.requester_name : exchangeRequest.owner_name
-  const otherUser = otherUserName || (isOwner ? 'ผู้ขอแลก' : 'เจ้าของโพสต์')
+  const otherUser = otherUserName || (isOwner ? 'Requester' : 'Post Owner')
   const otherUserFaculty = isOwner ? exchangeRequest.requester_faculty : exchangeRequest.owner_faculty
   const otherUserAvatar = isOwner ? exchangeRequest.requester_avatar_url : exchangeRequest.owner_avatar_url
-  const canAccept = exchangeRequest.status === 'pending' || exchangeRequest.status === 'chatting'
-  const canReject = exchangeRequest.status === 'pending' || exchangeRequest.status === 'chatting'
   const bothAccepted = exchangeRequest.owner_accepted && exchangeRequest.requester_accepted
+  const currentUserAccepted = isOwner ? exchangeRequest.owner_accepted : exchangeRequest.requester_accepted
+  const otherUserAccepted = isOwner ? exchangeRequest.requester_accepted : exchangeRequest.owner_accepted
   const showChatButton = exchangeRequest.status === 'chatting' || bothAccepted
+  // Show "Waiting for the other party to accept" message only when current user has accepted but the other hasn't
+  const showWaitingMessage = currentUserAccepted && !otherUserAccepted
+  // Show accept/reject buttons only when user hasn't accepted yet and status is still pending or chatting
+  const canAccept = !currentUserAccepted && (exchangeRequest.status === 'pending' || exchangeRequest.status === 'chatting')
+  const canReject = !currentUserAccepted && (exchangeRequest.status === 'pending' || exchangeRequest.status === 'chatting')
 
-  // คำนวณ CO₂ footprint และ CO₂ ที่ลดได้
+  // Calculate CO₂ footprint and CO₂ reduced
   const calculateCO2 = () => {
     if (!exchangeRequest.item_category || !exchangeRequest.item_condition) return null
     
@@ -294,7 +272,7 @@ export default function ExchangeRequestDetailPage() {
         className="mb-6 inline-flex items-center gap-2 text-gray-600 hover:text-gray-900"
       >
         <ArrowLeft size={20} />
-        <span>กลับ</span>
+        <span>Back</span>
       </button>
 
       {/* Header Section */}
@@ -327,7 +305,7 @@ export default function ExchangeRequestDetailPage() {
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <RefreshCw size={20} className="text-primary" />
-            <span className="text-lg font-semibold text-gray-900">คำขอแลกเปลี่ยน</span>
+            <span className="text-lg font-semibold text-gray-900">Exchange Request</span>
           </div>
           <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-gray-700">
             ID: {exchangeRequest.id ? exchangeRequest.id.slice(0, 8) : 'N/A'}
@@ -336,7 +314,7 @@ export default function ExchangeRequestDetailPage() {
 
         {/* Items Display */}
         <div className="mb-6 flex items-center gap-4">
-          {/* Owner's Item (ฝั่งซ้าย - Item ของเจ้าของโพสต์) */}
+          {/* Owner's Item (Left side - Post owner's item) */}
           <div className="flex-1 rounded-[16px] bg-white p-4 shadow-sm">
             <div className="mb-3 aspect-square w-full overflow-hidden rounded-lg bg-gray-100">
               {exchangeRequest.item_image_url && !imageErrors.owner ? (
@@ -358,13 +336,8 @@ export default function ExchangeRequestDetailPage() {
                     })
                     setImageErrors(prev => ({ ...prev, owner: true }))
                   }}
-                  onLoad={(e) => {
-                    console.log('[OWNER ITEM] Image loaded successfully:', {
-                      url: exchangeRequest.item_image_url?.substring(0, 100),
-                      title: exchangeRequest.item_title,
-                      itemId: exchangeRequest.item_id,
-                      urlType: exchangeRequest.item_image_url?.startsWith('data:') ? 'base64' : 'url'
-                    })
+                  onLoad={() => {
+                    // Image loaded successfully
                   }}
                 />
               ) : (
@@ -372,7 +345,7 @@ export default function ExchangeRequestDetailPage() {
                   <div className="text-center">
                     <Package size={48} className="mx-auto mb-2" />
                     <p className="text-xs">
-                      {exchangeRequest.item_image_url ? 'ไม่สามารถโหลดรูปภาพ' : 'ไม่มีรูปภาพ'}
+                      {exchangeRequest.item_image_url ? 'Failed to load image' : 'No image'}
                     </p>
                   </div>
                 </div>
@@ -381,7 +354,7 @@ export default function ExchangeRequestDetailPage() {
             <div className="mb-2">
               <div className="flex items-start justify-between gap-2">
                 <h3 className="font-semibold text-gray-900">
-                  {exchangeRequest.item_title || 'ไม่มีชื่อสินค้า'}
+                  {exchangeRequest.item_title || 'No item name'}
                 </h3>
                 {exchangeRequest.item_pickup_location && (
                   <div className="flex items-center gap-1 text-xs text-gray-600 whitespace-nowrap">
@@ -415,7 +388,7 @@ export default function ExchangeRequestDetailPage() {
             <RefreshCw size={24} />
           </div>
 
-          {/* Requester's Item (ฝั่งขวา - Item ของผู้ขอแลก) */}
+          {/* Requester's Item (Right side - Requester's item) */}
           <div className="flex-1 rounded-[16px] bg-white p-4 shadow-sm">
             <div className="mb-3 aspect-square w-full overflow-hidden rounded-lg bg-gray-100">
               {exchangeRequest.requester_item_image_url && !imageErrors.requester ? (
@@ -437,13 +410,8 @@ export default function ExchangeRequestDetailPage() {
                     })
                     setImageErrors(prev => ({ ...prev, requester: true }))
                   }}
-                  onLoad={(e) => {
-                    console.log('[REQUESTER ITEM] Image loaded successfully:', {
-                      url: exchangeRequest.requester_item_image_url?.substring(0, 100),
-                      name: exchangeRequest.requester_item_name,
-                      category: exchangeRequest.requester_item_category,
-                      urlType: exchangeRequest.requester_item_image_url?.startsWith('data:') ? 'base64' : 'url'
-                    })
+                  onLoad={() => {
+                    // Image loaded successfully
                   }}
                 />
               ) : (
@@ -451,7 +419,7 @@ export default function ExchangeRequestDetailPage() {
                   <div className="text-center">
                     <Package size={48} className="mx-auto mb-2" />
                     <p className="text-xs">
-                      {exchangeRequest.requester_item_image_url ? 'ไม่สามารถโหลดรูปภาพ' : 'ไม่มีรูปภาพ'}
+                      {exchangeRequest.requester_item_image_url ? 'Failed to load image' : 'No image'}
                     </p>
                   </div>
                 </div>
@@ -503,7 +471,7 @@ export default function ExchangeRequestDetailPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold text-gray-700">CO₂ Footprint</p>
-                <p className="text-xs text-gray-600">ของสินค้านี้</p>
+                <p className="text-xs text-gray-600">of this item</p>
               </div>
               <div className="text-right">
                 <p className="text-lg font-bold text-primary">
@@ -522,7 +490,7 @@ export default function ExchangeRequestDetailPage() {
           <div className="mb-4 flex items-center gap-2">
             <CheckCircle size={24} className="text-green-500" />
             <p className="text-lg font-semibold text-gray-900">
-              ทั้งสองฝ่ายยอมรับแล้ว – พร้อมแชท!
+              Both parties accepted – Ready to chat!
             </p>
           </div>
           {/* CO₂ Reduction Info */}
@@ -530,8 +498,8 @@ export default function ExchangeRequestDetailPage() {
             <div className="mb-4 rounded-[16px] bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-gray-700">CO₂ ที่ลดได้</p>
-                  <p className="text-xs text-gray-600">จากการแลกเปลี่ยนนี้</p>
+                  <p className="text-sm font-semibold text-gray-700">CO₂ Reduced</p>
+                  <p className="text-xs text-gray-600">From this exchange</p>
                 </div>
                 <div className="text-right">
                   <p className="text-2xl font-bold text-primary">
@@ -548,9 +516,25 @@ export default function ExchangeRequestDetailPage() {
           >
             <div className="flex items-center justify-center gap-2">
               <MessageCircle size={24} />
-              <span>เริ่มแชท</span>
+              <span>Start Chat</span>
             </div>
           </button>
+        </div>
+      ) : showWaitingMessage ? (
+        <div className="rounded-[24px] bg-yellow-50 p-6 shadow-soft">
+          <div className="mb-4 flex items-center gap-2">
+            <Clock size={24} className="text-yellow-600" />
+            <p className="text-lg font-semibold text-gray-900">
+              Waiting for the other party to accept
+            </p>
+          </div>
+          <div className="rounded-[16px] bg-white p-4 shadow-sm">
+            <p className="text-sm text-gray-700">
+              {isOwner
+                ? 'You have accepted. Waiting for the requester to accept'
+                : 'You have accepted. Waiting for the post owner to accept'}
+            </p>
+          </div>
         </div>
       ) : (
         <div className="rounded-[24px] bg-yellow-50 p-6 shadow-soft">
@@ -558,8 +542,8 @@ export default function ExchangeRequestDetailPage() {
             <Clock size={24} className="text-yellow-600" />
             <p className="text-lg font-semibold text-gray-900">
               {isOwner
-                ? `${otherUser} ต้องการแลกของกับคุณ`
-                : `คุณต้องการแลกของกับ ${otherUser}`}
+                ? `${otherUser} wants to exchange with you`
+                : `You want to exchange with ${otherUser}`}
             </p>
           </div>
           {(canAccept || canReject) && (
@@ -567,11 +551,11 @@ export default function ExchangeRequestDetailPage() {
               <button
                 onClick={handleAccept}
                 disabled={processing}
-                className="flex-1 rounded-full bg-[#0E8B43] px-6 py-4 text-lg font-semibold text-white shadow-card transition hover:bg-[#0B6C33] disabled:opacity-50"
+                className="flex-1 rounded-full bg-primary px-6 py-4 text-lg font-semibold text-white shadow-card transition hover:bg-primary-dark disabled:opacity-50"
               >
                 <div className="flex items-center justify-center gap-2">
                   <CheckCircle size={24} />
-                  <span>ยอมรับ</span>
+                  <span>Accept</span>
                 </div>
               </button>
               <button
@@ -581,7 +565,7 @@ export default function ExchangeRequestDetailPage() {
               >
                 <div className="flex items-center justify-center gap-2">
                   <XCircle size={24} />
-                  <span>ปฏิเสธ</span>
+                  <span>Reject</span>
                 </div>
               </button>
             </div>

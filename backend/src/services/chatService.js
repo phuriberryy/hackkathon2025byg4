@@ -43,7 +43,7 @@ export const initChatServer = (server) => {
       if (!body || !chatId) return
 
       const membership = await query(
-        `SELECT c.*, er.exchange_request_id, er.owner_accepted, er.requester_accepted
+        `SELECT c.*, er.owner_accepted, er.requester_accepted
          FROM chats c
          LEFT JOIN exchange_requests er ON c.exchange_request_id = er.id
          WHERE c.id=$1 AND (c.creator_id=$2 OR c.participant_id=$2)`,
@@ -64,6 +64,12 @@ export const initChatServer = (server) => {
       }
       
       if (chat.status !== 'active') {
+        return
+      }
+
+      // หลังจากยืนยัน QR แล้วไม่สามารถส่งข้อความได้อีก
+      if (chat.qr_confirmed) {
+        socket.emit('chat:error', { message: 'ไม่สามารถส่งข้อความได้ เนื่องจากยืนยันการแลกเปลี่ยนแล้ว' })
         return
       }
 

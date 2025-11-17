@@ -38,29 +38,29 @@ export default function ExchangeRequestModal({ open, onClose, itemId }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!token) {
-      alert('กรุณาเข้าสู่ระบบก่อนส่งคำขอแลกเปลี่ยน')
+      alert('Please log in before sending exchange request')
       return
     }
     if (!itemId) {
-      alert('ไม่พบข้อมูลสินค้า กรุณาลองใหม่อีกครั้ง')
+      alert('Item not found. Please try again')
       return
     }
 
     // Validate form fields
     if (!formData.itemName.trim()) {
-      alert('กรุณากรอกชื่อสินค้าของคุณ')
+      alert('Please enter your item name')
       return
     }
     if (!formData.category) {
-      alert('กรุณาเลือกหมวดหมู่')
+      alert('Please select category')
       return
     }
     if (!formData.condition) {
-      alert('กรุณาเลือกสภาพสินค้า')
+      alert('Please select condition')
       return
     }
     if (!formData.description.trim()) {
-      alert('กรุณากรอกรายละเอียดสินค้า')
+      alert('Please enter item description')
       return
     }
 
@@ -82,19 +82,8 @@ export default function ExchangeRequestModal({ open, onClose, itemId }) {
         requesterItemImageUrl: imageUrl || undefined,
       }
 
-      console.log('=== Sending Exchange Request ===')
-      console.log('Item ID (Owner):', itemId)
-      console.log('Requester Item Name:', formData.itemName)
-      console.log('Requester Item Category:', formData.category)
-      console.log('Requester Item Condition:', formData.condition)
-      console.log('Requester Item Image URL:', imageUrl ? `${imageUrl.substring(0, 50)}...` : 'null')
-      console.log('Full payload:', {
-        ...payload,
-        requesterItemImageUrl: imageUrl ? `${imageUrl.substring(0, 50)}... (base64)` : 'null'
-      })
-      console.log('================================')
       await exchangeApi.request(token, payload)
-      alert('ส่งคำขอแลกเปลี่ยนสำเร็จ')
+      alert('Exchange request sent successfully')
       onClose()
       setFormData({
         itemName: '',
@@ -106,26 +95,26 @@ export default function ExchangeRequestModal({ open, onClose, itemId }) {
       setImagePreview(null)
     } catch (err) {
       console.error('Exchange request error:', err)
-      let errorMsg = err.message || (err.errors && JSON.stringify(err.errors)) || 'ไม่สามารถส่งคำขอได้'
+      let errorMsg = err.message || (err.errors && JSON.stringify(err.errors)) || 'Failed to send request'
       
       // แปลง error message เป็นภาษาไทย
       if (errorMsg.includes('You cannot exchange your own item')) {
-        errorMsg = 'คุณไม่สามารถแลกเปลี่ยนสินค้าของตัวเองได้'
+        errorMsg = 'You cannot exchange your own item'
       } else if (errorMsg.includes('already exists') || errorMsg.includes('already sent')) {
-        errorMsg = 'คุณได้ส่งคำขอแลกเปลี่ยนสำหรับสินค้านี้ไปแล้ว'
+        errorMsg = 'You have already sent an exchange request for this item'
       }
       
       // ถ้ามี existingRequestId แสดงข้อความและถามว่าต้องการดูคำขอที่มีอยู่หรือไม่
       if (err.existingRequestId) {
         const shouldView = window.confirm(
-          errorMsg + '\n\nคุณต้องการไปดูคำขอที่มีอยู่หรือไม่?'
+          errorMsg + '\n\nDo you want to view the existing request?'
         )
         if (shouldView) {
           onClose()
           navigate(`/exchange/${err.existingRequestId}`)
         }
       } else {
-        alert('ส่งคำขอแลกเปลี่ยนไม่สำเร็จ: ' + errorMsg)
+        alert('Failed to send exchange request: ' + errorMsg)
       }
     } finally {
       setSubmitting(false)
@@ -155,8 +144,8 @@ export default function ExchangeRequestModal({ open, onClose, itemId }) {
     <Modal
       open={open}
       onClose={onClose}
-      title="ขอแลกเปลี่ยน"
-      subtitle="ส่งคำขอแลกเปลี่ยน"
+      title="Request Exchange"
+      subtitle="Send Exchange Request"
       size="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -303,7 +292,7 @@ export default function ExchangeRequestModal({ open, onClose, itemId }) {
             className="flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white shadow-md hover:bg-primary-dark transition disabled:opacity-60"
           >
             <CheckCircle size={18} />
-            {submitting ? 'กำลังส่ง...' : 'Send Exchange Request'}
+            {submitting ? 'Sending...' : 'Send Exchange Request'}
           </button>
         </div>
       </form>

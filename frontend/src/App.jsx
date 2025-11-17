@@ -8,8 +8,6 @@ import LoginPage from './pages/LoginPage'
 import HomePage from './pages/HomePage'
 import ProfilePage from './pages/ProfilePage'
 import RegisterPage from './pages/RegisterPage'
-import ForgotPasswordPage from './pages/ForgotPasswordPage'
-import ResetPasswordPage from './pages/ResetPasswordPage'
 import ExchangeRequestDetailPage from './pages/ExchangeRequestDetailPage'
 import ItemDetailPage from './pages/ItemDetailPage'
 import PostItemModal from './components/modals/PostItemModal'
@@ -74,10 +72,29 @@ function AppContent() {
 
   useEffect(() => {
     if (!token) return
-    const socket = io(SOCKET_URL, { auth: { token } })
+    const socket = io(SOCKET_URL, {
+      auth: { token },
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: Infinity,
+      timeout: 20000,
+      transports: ['polling', 'websocket'],
+      upgrade: true,
+    })
+    
+    socket.on('connect_error', (err) => {
+      // Silently handle connection errors for notifications
+      // Only log non-transport errors to reduce console spam
+      if (err.message !== 'websocket error') {
+        console.debug('Notification socket connection error:', err.message)
+      }
+    })
+
     socket.on('notification:new', () => {
       setUnreadCount((prev) => prev + 1)
     })
+    
     return () => {
       socket.disconnect()
     }
@@ -119,8 +136,6 @@ function AppContent() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route
             path="/"
             element={

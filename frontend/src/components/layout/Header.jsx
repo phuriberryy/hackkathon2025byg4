@@ -83,7 +83,7 @@ function Header({ unread, onNotificationsClick }) {
                 onClick={logout}
                 className="rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
               >
-                ออกจากระบบ
+                Logout
               </button>
             </>
           ) : (
@@ -96,7 +96,7 @@ function Header({ unread, onNotificationsClick }) {
                   : 'border border-gray-200 text-gray-700 hover:bg-gray-50'
               }`}
             >
-              เข้าสู่ระบบ
+              Log In
             </button>
           )}
         </div>
@@ -140,7 +140,7 @@ function Header({ unread, onNotificationsClick }) {
                 }}
                 className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700"
               >
-                ออกจากระบบ
+                Logout
               </button>
             ) : (
               <button
@@ -151,7 +151,7 @@ function Header({ unread, onNotificationsClick }) {
                 }}
                 className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700"
               >
-                เข้าสู่ระบบ
+                Log In
               </button>
             )}
           </div>
@@ -162,6 +162,7 @@ function Header({ unread, onNotificationsClick }) {
 }
 
 export default Header
+
 
 
 

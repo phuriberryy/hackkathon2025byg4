@@ -49,14 +49,14 @@ export default function ChatModal({ open, onClose, initialChatId }) {
     if (!chat) return ''
     switch (chat.status) {
       case 'active':
-        return chat.qrConfirmed ? 'ยืนยันแล้ว' : 'พร้อมแชท'
+        return chat.qrConfirmed ? 'Confirmed' : 'Ready to chat'
       case 'pending':
         if (chat.ownerAccepted || chat.requesterAccepted) {
-          return 'รออีกฝ่ายยืนยัน'
+          return 'Waiting for the other party to confirm'
         }
-        return 'รอการยืนยัน'
+        return 'Waiting for confirmation'
       case 'declined':
-        return 'ถูกปฏิเสธ'
+        return 'Declined'
       default:
         return chat.status
     }
@@ -69,8 +69,12 @@ export default function ChatModal({ open, onClose, initialChatId }) {
     chatApi
       .list(token)
       .then((data) => {
-        setChats(data)
-        setActiveChatId((current) => current ?? data[0]?.id ?? null)
+        setChats(Array.isArray(data) ? data : [])
+        setActiveChatId((current) => current ?? (Array.isArray(data) && data[0]?.id ? data[0].id : null))
+      })
+      .catch((err) => {
+        console.error('Failed to load chats:', err)
+        setChats([])
       })
       .finally(() => setLoading(false))
   }, [open, token])
@@ -80,21 +84,61 @@ export default function ChatModal({ open, onClose, initialChatId }) {
 
     const socket = io(SOCKET_URL, {
       auth: { token },
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: Infinity, // Keep trying to reconnect
+      timeout: 20000,
+      transports: ['polling', 'websocket'], // Try polling first (more reliable), then websocket
+      upgrade: true, // Allow upgrade from polling to websocket
     })
     socketRef.current = socket
 
     socket.on('connect_error', (err) => {
-      console.error('Socket error', err)
+      // Only log once to reduce console spam, and only for non-transport errors
+      if (!socketRef.current?.hasLoggedError && err.message !== 'websocket error') {
+        console.error('Socket connection error:', err.message)
+        socketRef.current.hasLoggedError = true
+        // Reset after 10 seconds to allow retry logging
+        setTimeout(() => {
+          if (socketRef.current) {
+            socketRef.current.hasLoggedError = false
+          }
+        }, 10000)
+      }
+    })
+
+    socket.on('connect', () => {
+      // Reset error flag on successful connection
+      if (socketRef.current) {
+        socketRef.current.hasLoggedError = false
+      }
+      // Rejoin active chat room after reconnection
+      if (activeChatRef.current) {
+        socket.emit('chat:join', { chatId: activeChatRef.current })
+        // Reload messages after reconnection
+        if (token && activeChatRef.current) {
+          chatApi.messages(token, activeChatRef.current)
+            .then(setMessages)
+            .catch((err) => {
+              console.error('Failed to reload messages after reconnection:', err)
+              // Don't show alert for reconnection errors
+            })
+        }
+      }
     })
     
     socket.on('chat:error', ({ message }) => {
-      alert(message || 'ไม่สามารถส่งข้อความได้')
+      alert(message || 'Failed to send message')
     })
 
     socket.on('chat:message', (message) => {
-      setMessages((prev) =>
-        message.chat_id === activeChatRef.current ? [...prev, message] : prev
-      )
+      setMessages((prev) => {
+        // Check if message already exists (avoid duplicates after reconnection)
+        const exists = prev.some((msg) => msg.id === message.id)
+        if (exists) return prev
+        return message.chat_id === activeChatRef.current ? [...prev, message] : prev
+      })
     })
 
     socket.on('chat:created', (chat) => {
@@ -120,6 +164,11 @@ export default function ChatModal({ open, onClose, initialChatId }) {
           msg.id === messageId ? { ...msg, read_at: readAt, is_read: true } : msg
         )
       )
+    })
+
+    socket.on('disconnect', (reason) => {
+      console.debug('Socket disconnected:', reason)
+      // Will automatically reconnect due to reconnection: true
     })
 
     return () => {
@@ -156,7 +205,7 @@ export default function ChatModal({ open, onClose, initialChatId }) {
     if (!token || !activeChatId) return
     const trimmed = (code || '').trim()
     if (!trimmed) {
-      setQrError('กรุณากรอกรหัสแลกเปลี่ยน')
+      setQrError('Please enter the exchange code')
       return
     }
     setQrError('')
@@ -167,7 +216,7 @@ export default function ChatModal({ open, onClose, initialChatId }) {
       updateChatInState(updated)
       setQrCodeInput('')
     } catch (err) {
-      setQrError(err.message || 'ไม่สามารถยืนยันรหัสได้')
+      setQrError(err.message || 'Failed to confirm code')
       scanLockRef.current = false
     } finally {
       setConfirmingQr(false)
@@ -251,7 +300,7 @@ export default function ChatModal({ open, onClose, initialChatId }) {
           )
         } catch (err) {
           if (isMounted) {
-            setQrError(err?.message || 'ไม่สามารถเปิดกล้องได้')
+            setQrError(err?.message || 'Failed to open camera')
           }
         }
       }
@@ -270,8 +319,16 @@ export default function ChatModal({ open, onClose, initialChatId }) {
     if (!token || !activeChatId || !open) return
 
     activeChatRef.current = activeChatId
-    socketRef.current?.emit('chat:join', { chatId: activeChatId })
-    chatApi.messages(token, activeChatId).then(setMessages)
+    // Only join if socket is connected
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('chat:join', { chatId: activeChatId })
+    }
+    chatApi.messages(token, activeChatId)
+      .then(setMessages)
+      .catch((err) => {
+        console.error('Failed to load messages:', err)
+        setMessages([]) // Reset messages on error
+      })
   }, [activeChatId, token, open])
 
   useEffect(() => {
@@ -281,8 +338,24 @@ export default function ChatModal({ open, onClose, initialChatId }) {
   const handleSend = async () => {
     if (!newMessage.trim() || !activeChatId) return
     if (!activeChat?.canSendMessages) return
-    socketRef.current?.emit('chat:message', { chatId: activeChatId, body: newMessage.trim() })
-    setNewMessage('')
+    
+    // Check socket connection with retry
+    if (!socketRef.current?.connected) {
+      // Wait a bit for reconnection
+      await new Promise(resolve => setTimeout(resolve, 500))
+      if (!socketRef.current?.connected) {
+        alert('Cannot connect to server. Please wait a moment and try again')
+        return
+      }
+    }
+    
+    try {
+      socketRef.current.emit('chat:message', { chatId: activeChatId, body: newMessage.trim() })
+      setNewMessage('')
+    } catch (err) {
+      console.error('Failed to send message:', err)
+      alert('Failed to send message. Please try again')
+    }
   }
 
   const handleAcceptChat = async () => {
@@ -293,7 +366,7 @@ export default function ChatModal({ open, onClose, initialChatId }) {
       const updated = await chatApi.accept(token, activeChatId)
       updateChatInState(updated)
     } catch (err) {
-      setActionError(err.message || 'ไม่สามารถยอมรับได้')
+      setActionError(err.message || 'Failed to accept')
     } finally {
       setChatActionLoading(false)
     }
@@ -301,14 +374,14 @@ export default function ChatModal({ open, onClose, initialChatId }) {
 
   const handleDeclineChat = async () => {
     if (!token || !activeChatId) return
-    if (!window.confirm('คุณต้องการปฏิเสธการแชทนี้หรือไม่?')) return
+    if (!window.confirm('Do you want to decline this chat?')) return
     setChatActionLoading(true)
     setActionError('')
     try {
       const updated = await chatApi.decline(token, activeChatId)
       updateChatInState(updated)
     } catch (err) {
-      setActionError(err.message || 'ไม่สามารถปฏิเสธได้')
+      setActionError(err.message || 'Failed to decline')
     } finally {
       setChatActionLoading(false)
     }
@@ -316,16 +389,28 @@ export default function ChatModal({ open, onClose, initialChatId }) {
 
   const handleStartChat = async () => {
     if (!recipientEmail || !token) return
-    if (!recipientEmail.endsWith('@cmu.ac.th')) {
-      alert('ต้องใช้อีเมล @cmu.ac.th เท่านั้น')
+    const trimmedEmail = recipientEmail.trim()
+    if (!trimmedEmail) {
+      alert('Please enter email')
       return
     }
-    const chat = await chatApi.create(token, { participantEmail: recipientEmail })
-    if (!chats.find((c) => c.id === chat.id)) {
-      setChats((prev) => [chat, ...prev])
+    if (!trimmedEmail.endsWith('@cmu.ac.th')) {
+      alert('Must use @cmu.ac.th email only')
+      return
     }
-    setRecipientEmail('')
-    setActiveChatId(chat.id)
+    try {
+      const chat = await chatApi.create(token, { participantEmail: trimmedEmail })
+      if (chat && chat.id) {
+        if (!chats.find((c) => c.id === chat.id)) {
+          setChats((prev) => [chat, ...prev])
+        }
+        setRecipientEmail('')
+        setActiveChatId(chat.id)
+      }
+    } catch (err) {
+      console.error('Failed to start chat:', err)
+      alert(err.message || 'Failed to start chat. Please try again')
+    }
   }
 
   const chatStatus = activeChat?.status
@@ -350,17 +435,18 @@ export default function ChatModal({ open, onClose, initialChatId }) {
   const showQrRequester = isExchangeChat && chatStatus === 'active' && isRequester && qrCodeExists
   // --- END: โค้ดที่แก้ไข ---
   
-  const chatDisabled = chatDeclined || !activeChat?.canSendMessages 
+  // หลังจากยืนยัน QR แล้วไม่สามารถส่งข้อความได้อีก
+  const chatDisabled = chatDeclined || !activeChat?.canSendMessages || qrConfirmed 
 
   return (
     <Modal open={open} onClose={onClose} title="Messages" size="xl">
       {!token ? (
-        <p className="text-sm text-gray-500">กรุณาเข้าสู่ระบบเพื่อใช้งานแชท</p>
+        <p className="text-sm text-gray-500">Please log in to use chat</p>
       ) : (
         <div className="flex gap-4">
           <div className="w-64 space-y-3">
             <div>
-              <label className="text-xs font-semibold text-gray-500">เริ่มแชทกับอีเมล CMU</label>
+              <label className="text-xs font-semibold text-gray-500">Start chat with CMU email</label>
               <div className="mt-2 flex gap-2">
                 <input
                   type="email"
@@ -374,37 +460,41 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                   onClick={handleStartChat}
                   className="rounded-xl bg-primary px-3 py-2 text-xs font-semibold text-white"
                 >
-                  เริ่ม
+                  Start
                 </button>
               </div>
             </div>
             <div className="rounded-2xl bg-surface p-3">
-              <p className="mb-2 text-xs font-semibold text-gray-500">การสนทนา</p>
+              <p className="mb-2 text-xs font-semibold text-gray-500">Conversations</p>
               <div className="space-y-2 max-h-72 overflow-y-auto">
                 {loading && (
                   <div className="flex items-center gap-2 text-xs text-gray-500">
                     <Loader2 className="animate-spin" size={14} /> Loading...
                   </div>
                 )}
-                {chats.map((chat) => (
-                  <button
-                    key={chat.id}
-                    className={`w-full rounded-xl px-3 py-2 text-left text-sm ${
-                      activeChatId === chat.id ? 'bg-white shadow-sm' : 'hover:bg-white/60'
-                    }`}
-                    onClick={() => setActiveChatId(chat.id)}
-                  >
-                    <p className="font-semibold text-gray-800">{chat.participant_name || 'CMU Student'}</p>
-                    <p className="text-xs text-gray-500">{chat.participant_email}</p>
-                    {chat.isExchangeChat && (
-                      <p className="mt-1 text-[11px] font-semibold text-primary">
-                        {getChatStatusLabel(chat)}
-                      </p>
-                    )}
-                  </button>
-                ))}
-                {!loading && chats.length === 0 && (
-                  <p className="text-xs text-gray-500">ยังไม่มีการสนทนา</p>
+                {Array.isArray(chats) && chats.length > 0 ? (
+                  chats.map((chat) => {
+                    if (!chat || !chat.id) return null
+                    return (
+                      <button
+                        key={chat.id}
+                        className={`w-full rounded-xl px-3 py-2 text-left text-sm ${
+                          activeChatId === chat.id ? 'bg-white shadow-sm' : 'hover:bg-white/60'
+                        }`}
+                        onClick={() => setActiveChatId(chat.id)}
+                      >
+                        <p className="font-semibold text-gray-800">{chat.participant_name || 'CMU Student'}</p>
+                        <p className="text-xs text-gray-500">{chat.participant_email || ''}</p>
+                        {chat.isExchangeChat && (
+                          <p className="mt-1 text-[11px] font-semibold text-primary">
+                            {getChatStatusLabel(chat)}
+                          </p>
+                        )}
+                      </button>
+                    )
+                  })
+                ) : (
+                  !loading && <p className="text-xs text-gray-500">No conversations yet</p>
                 )}
               </div>
             </div>
@@ -417,11 +507,11 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                   <div className="flex items-center gap-2">
                   <MessageCircle size={18} className="text-primary" />
                   <div>
-                    <p className="text-sm font-semibold">{activeChat.participant_name}</p>
-                    <p className="text-xs text-gray-500">{activeChat.participant_email}</p>
+                    <p className="text-sm font-semibold">{activeChat?.participant_name || 'CMU Student'}</p>
+                    <p className="text-xs text-gray-500">{activeChat?.participant_email || ''}</p>
                   </div>
                 </div>
-                  {activeChat.itemTitle && (
+                  {activeChat?.itemTitle && (
                     <span className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
                       {activeChat.itemTitle}
                     </span>
@@ -438,19 +528,19 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                   <div className="mb-3 space-y-3">
                     {chatDeclined && (
                       <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 shadow-inner">
-                        การแชทนี้ถูกปฏิเสธแล้ว ไม่สามารถสนทนาต่อได้
+                        This chat has been declined. Cannot continue conversation.
                       </div>
                     )}
 
                     {showChatActions && !chatDeclined && (
                       <div className="rounded-2xl bg-yellow-50 px-4 py-3 text-sm text-yellow-800 shadow-inner">
-                        <p className="font-semibold text-yellow-900">ยืนยันเพื่อเปิดแชท</p>
+                        <p className="font-semibold text-yellow-900">Confirm to open chat</p>
                         <p className="mt-1 text-xs text-yellow-700">
                           {hasAccepted && otherAccepted
-                            ? 'กรุณายอมรับเพื่อสร้าง QR Code ยืนยันการแลกเปลี่ยน'
+                            ? 'Please accept to create QR Code for exchange confirmation'
                             : hasAccepted
-                            ? 'คุณยืนยันแล้ว กำลังรออีกฝ่ายตอบรับ'
-                            : 'กรุณายอมรับเพื่อเปิดการสนทนาและสร้าง QR Code ยืนยันการแลกเปลี่ยน'}
+                            ? 'You have confirmed. Waiting for the other party to respond'
+                            : 'Please accept to open conversation and create QR Code for exchange confirmation'}
                         </p>
                         {(!hasAccepted || (hasAccepted && otherAccepted)) && (
                           <div className="mt-3 flex flex-wrap gap-2">
@@ -465,7 +555,7 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                               ) : (
                                 <>
                                   <X size={16} />
-                                  <span>ปฏิเสธ</span>
+                                  <span>Decline</span>
                                 </>
                               )}
                             </button>
@@ -480,7 +570,7 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                               ) : (
                                 <>
                                   <Check size={16} />
-                                  <span>ยอมรับ</span>
+                                  <span>Accept</span>
                                 </>
                               )}
                             </button>
@@ -488,7 +578,7 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                         )}
                         {hasAccepted && !otherAccepted && (
                           <div className="mt-3 rounded-xl bg-white px-3 py-2 text-xs text-yellow-700">
-                            รออีกฝ่ายยืนยันอยู่...
+                            Waiting for the other party to confirm...
                           </div>
                         )}
                       </div>
@@ -502,9 +592,9 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                           // 1. ถ้า QR ยืนยันแล้ว: แสดง "แลกเปลี่ยนสำเร็จ"
                           // -------------------------------
                           <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm text-green-700 shadow-inner">
-                            <p className="font-semibold text-green-900">✅ แลกเปลี่ยนสำเร็จ!</p>
+                            <p className="font-semibold text-green-900">✅ Exchange completed!</p>
                             <p className="mt-1 text-xs text-green-600">
-                              การแลกเปลี่ยนเสร็จสมบูรณ์แล้ว ขอบคุณที่ใช้บริการ CMU ShareCycle
+                              The exchange has been completed. Thank you for using CMU ShareCycle
                             </p>
                           </div>
                         ) : (
@@ -521,7 +611,7 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                                       type="button"
                                       onClick={() => setIsQrExpanded(false)}
                                       className="absolute right-4 top-4 rounded-full p-1 text-gray-400 transition hover:bg-gray-900/10"
-                                      title="ย่อ"
+                                      title="Collapse"
                                     >
                                       <X size={18} />
                                     </button>
@@ -532,9 +622,9 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                                         <QrCode size={22} />
                                       </div>
                                       <div className="text-left">
-                                        <p className="text-base font-semibold text-primary">แสดง QR Code</p>
+                                        <p className="text-base font-semibold text-primary">Show QR Code</p>
                                         <p className="text-xs text-gray-500">
-                                          แสดง QR Code หรือรหัสให้อีกฝ่ายเพื่อยืนยันการแลกเปลี่ยน
+                                          Show QR Code or code to the other party to confirm the exchange
                                         </p>
                                       </div>
                                     </div>
@@ -544,24 +634,24 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                                           <QRCodeCanvas value={activeChat.qrCode} size={200} includeMargin />
                                         </div>
                                         <div className="mx-auto mt-6 w-full rounded-[18px] bg-white px-4 py-3 shadow-inner">
-                                          <p className="text-xs font-semibold text-gray-500">รหัสการแลกเปลี่ยน</p>
+                                          <p className="text-xs font-semibold text-gray-500">Exchange Code</p>
                                           <p className="mt-1 text-2xl font-bold tracking-widest text-primary">
                                             {activeChat.qrCode}
                                           </p>
                                           <p className="mt-2 text-xs text-gray-500">
-                                            ส่งรหัสนี้หรือให้เพื่อนสแกน QR Code เพื่อยืนยันการแลกเปลี่ยน
+                                            Send this code or have your friend scan the QR Code to confirm the exchange
                                           </p>
                                         </div>
                                       </>
                                     ) : (
-                                      <p className="mt-3 text-sm text-gray-600">กำลังสร้าง QR Code...</p>
+                                      <p className="mt-3 text-sm text-gray-600">Generating QR Code...</p>
                                     )}
                                     <div className="mt-4 rounded-[18px] bg-white px-4 py-3 text-left text-xs text-gray-600 shadow-inner">
-                                      <p className="font-semibold text-primary">คำแนะนำ:</p>
+                                      <p className="font-semibold text-primary">Instructions:</p>
                                       <ol className="mt-2 list-decimal space-y-1 pl-5">
-                                        <li>แสดง QR Code ให้อีกฝ่ายสแกน</li>
-                                        <li>หรือบอกรหัสด้านบนให้อีกฝ่ายใส่</li>
-                                        <li>เมื่ออีกฝ่ายยืนยันแล้ว การแลกเปลี่ยนจะเสร็จสมบูรณ์</li>
+                                        <li>Show QR Code for the other party to scan</li>
+                                        <li>Or tell them the code above to enter</li>
+                                        <li>When the other party confirms, the exchange will be completed</li>
                                       </ol>
                                     </div>
                                     {/* (เราลบ "✅ อีกฝ่ายยืนยัน..." ออกจากตรงนี้) */}
@@ -574,7 +664,7 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                                       type="button"
                                       onClick={() => setIsQrExpanded(false)}
                                       className="absolute right-4 top-4 rounded-full p-1 text-gray-400 transition hover:bg-gray-900/10"
-                                      title="ย่อ"
+                                      title="Collapse"
                                     >
                                       <X size={18} />
                                     </button>
@@ -582,9 +672,9 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                                     {/* --- เนื้อหา QR Code เดิมของ Requester --- */}
                                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                       <div>
-                                        <p className="text-base font-semibold text-primary">สแกน QR Code</p>
+                                        <p className="text-base font-semibold text-primary">Scan QR Code</p>
                                         <p className="text-xs text-gray-500">
-                                          สแกนหรือกรอกรหัสจากผู้โพสต์เพื่อยืนยันการแลกเปลี่ยน
+                                          Scan or enter the code from the poster to confirm the exchange
                                         </p>
                                       </div>
                                       <div className="flex gap-2 rounded-full bg-white p-1 text-xs font-semibold text-primary shadow-inner">
@@ -601,7 +691,7 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                                               : 'transition hover:bg-primary/10'
                                           }`}
                                         >
-                                          สแกนกล้อง
+                                          Scan Camera
                                         </button>
                                         <button
                                           type="button"
@@ -616,7 +706,7 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                                               : 'transition hover:bg-primary/10'
                                           }`}
                                         >
-                                          ใส่รหัส
+                                          Enter Code
                                         </button>
                                       </div>
                                     </div>
@@ -635,13 +725,13 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                                           </div>
                                         )}
                                         <div className="bg-black/70 px-4 py-3 text-center text-xs text-white">
-                                          กรุณาอนุญาตการใช้งานกล้อง และวาง QR Code ให้อยู่ในกรอบ
+                                          Please allow camera access and place QR Code within the frame
                                         </div>
                                       </div>
                                     ) : (
                                       <div className="mt-4 space-y-3 rounded-[24px] bg-white px-4 py-4 shadow-inner">
                                         <p className="text-xs font-semibold text-gray-600">
-                                          กรอกรหัสที่ได้รับ (รูปแบบ EX12345678)
+                                          Enter the code you received (format: EX12345678)
                                         </p>
                                         <input
                                           type="text"
@@ -659,17 +749,17 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                                           {confirmingQr ? (
                                             <Loader2 className="mx-auto animate-spin" size={16} />
                                           ) : (
-                                            'ยืนยันรหัส'
+                                            'Confirm Code'
                                           )}
                                         </button>
                                       </div>
                                     )}
                                     <div className="mt-4 rounded-[18px] bg-white px-4 py-3 text-left text-xs text-gray-600 shadow-inner">
-                                      <p className="font-semibold text-primary">วิธีสแกน:</p>
+                                      <p className="font-semibold text-primary">How to scan:</p>
                                       <ol className="mt-2 list-decimal space-y-1 pl-5">
-                                        <li>อนุญาตให้เข้าถึงกล้องของคุณ</li>
-                                        <li>วาง QR Code ที่ได้รับจากผู้โพสต์ให้อยู่ในกรอบ</li>
-                                        <li>ระบบจะสแกนอัตโนมัติเมื่อพบ QR Code</li>
+                                        <li>Allow access to your camera</li>
+                                        <li>Place the QR Code received from the poster within the frame</li>
+                                        <li>The system will scan automatically when QR Code is detected</li>
                                       </ol>
                                     </div>
                                     {qrError && (
@@ -688,15 +778,15 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                                   <span>
                                     {/* (โค้ดนี้ยังทำงานเหมือนเดิม แต่จะถูกซ่อนเมื่อ qrConfirmed=true) */}
                                     {qrConfirmed
-                                      ? 'ยืนยันการแลกเปลี่ยนแล้ว'
-                                      : 'พร้อมยืนยันการแลกเปลี่ยน'}
+                                      ? 'Exchange confirmed'
+                                      : 'Ready to confirm exchange'}
                                   </span>
                                 </div>
                                 <button
                                   onClick={() => setIsQrExpanded(true)}
                                   className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-white shadow-card transition hover:bg-primary-dark"
                                 >
-                                  {qrConfirmed ? 'ดู' : 'ขยาย'}
+                                  {qrConfirmed ? 'View' : 'Expand'}
                                 </button>
                               </div>
                             )}
@@ -711,9 +801,11 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                   )}
 
                 <div className="flex-1 space-y-2 overflow-y-auto pr-1">
-                  {messages.map((msg) => {
-                    const isSentByMe = msg.sender_id === user?.id || msg.is_sent_by_me
-                    const isRead = msg.is_read || msg.read_at !== null
+                  {Array.isArray(messages) && messages.length > 0 ? (
+                    messages.map((msg) => {
+                      if (!msg || !msg.id) return null
+                      const isSentByMe = msg.sender_id === user?.id || msg.is_sent_by_me
+                      const isRead = msg.is_read || msg.read_at !== null
                     
                     return (
                       <div
@@ -727,7 +819,7 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                               : 'bg-surface text-gray-800'
                           }`}
                         >
-                          {msg.body}
+                          {msg.body || ''}
                         </div>
                         {/* แสดงสถานะสำหรับข้อความที่ส่งเอง */}
                         {isSentByMe && (
@@ -735,19 +827,24 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                             {isRead ? (
                               <>
                                 <CheckCheck size={12} className="text-blue-500" />
-                                <span className="text-[10px] text-gray-500">อ่านแล้ว</span>
+                                <span className="text-[10px] text-gray-500">Read</span>
                               </>
                             ) : (
                               <>
                                 <Check size={12} className="text-gray-400" />
-                                <span className="text-[10px] text-gray-400">ส่งแล้ว</span>
+                                <span className="text-[10px] text-gray-400">Sent</span>
                               </>
                             )}
                           </div>
                         )}
                       </div>
                     )
-                  })}
+                    })
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-sm text-gray-500">
+                      No messages yet
+                    </div>
+                  )}
                   <div ref={bottomRef} />
                 </div>
 
@@ -762,7 +859,7 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                       }
                     }}
                     placeholder={
-                      chatDisabled ? 'ไม่สามารถส่งข้อความได้' : 'พิมพ์ข้อความ...'
+                      chatDisabled ? 'Cannot send messages' : 'Type a message...'
                     }
                     disabled={chatDisabled}
                     className="flex-1 rounded-2xl border border-gray-200 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:bg-gray-100"
@@ -780,7 +877,7 @@ export default function ChatModal({ open, onClose, initialChatId }) {
             ) : (
               <div className="flex h-full flex-col items-center justify-center text-sm text-gray-500">
                 <MessageCircle className="mb-2 text-primary" />
-                เลือกการสนทนาหรือเริ่มใหม่ด้วยอีเมล CMU
+                Select a conversation or start a new one with CMU email
               </div>
             )}
           </div>

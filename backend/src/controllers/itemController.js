@@ -1,6 +1,7 @@
 import { validationResult } from 'express-validator'
 import { query } from '../db/pool.js'
 import { calculateItemCO2 } from '../utils/co2Calculator.js'
+import { detectSpam, validateImage, checkDuplicateContent } from '../utils/contentModeration.js'
 
 // ดึง items ทั้งหมด (public)
 export const getItems = async (_req, res) => {
@@ -71,6 +72,54 @@ export const createItem = async (req, res) => {
     req.body
 
   try {
+    // Content moderation checks
+    const titleSpamCheck = detectSpam(title)
+    if (titleSpamCheck.isSpam) {
+      return res.status(400).json({ 
+        message: 'Title contains inappropriate content',
+        reason: titleSpamCheck.reason 
+      })
+    }
+
+    if (description) {
+      const descSpamCheck = detectSpam(description)
+      if (descSpamCheck.isSpam) {
+        return res.status(400).json({ 
+          message: 'Description contains inappropriate content',
+          reason: descSpamCheck.reason 
+        })
+      }
+    }
+
+    if (lookingFor) {
+      const lookingForSpamCheck = detectSpam(lookingFor)
+      if (lookingForSpamCheck.isSpam) {
+        return res.status(400).json({ 
+          message: 'Looking for contains inappropriate content',
+          reason: lookingForSpamCheck.reason 
+        })
+      }
+    }
+
+    // Image validation
+    if (imageUrl) {
+      const imageValidation = validateImage(imageUrl)
+      if (!imageValidation.isValid) {
+        return res.status(400).json({ 
+          message: 'Invalid image',
+          reason: imageValidation.reason 
+        })
+      }
+    }
+
+    // Check for duplicate content
+    const duplicateCheck = await checkDuplicateContent(query, req.user.id, title, description)
+    if (duplicateCheck.isDuplicate) {
+      return res.status(400).json({ 
+        message: duplicateCheck.reason 
+      })
+    }
+
     const result = await query(
       `INSERT INTO items (user_id, title, category, item_condition, looking_for, description, available_until, image_url, pickup_location)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
@@ -116,6 +165,48 @@ export const updateItem = async (req, res) => {
     req.body
 
   try {
+    // Content moderation checks for updates
+    if (title) {
+      const titleSpamCheck = detectSpam(title)
+      if (titleSpamCheck.isSpam) {
+        return res.status(400).json({ 
+          message: 'Title contains inappropriate content',
+          reason: titleSpamCheck.reason 
+        })
+      }
+    }
+
+    if (description) {
+      const descSpamCheck = detectSpam(description)
+      if (descSpamCheck.isSpam) {
+        return res.status(400).json({ 
+          message: 'Description contains inappropriate content',
+          reason: descSpamCheck.reason 
+        })
+      }
+    }
+
+    if (lookingFor) {
+      const lookingForSpamCheck = detectSpam(lookingFor)
+      if (lookingForSpamCheck.isSpam) {
+        return res.status(400).json({ 
+          message: 'Looking for contains inappropriate content',
+          reason: lookingForSpamCheck.reason 
+        })
+      }
+    }
+
+    // Image validation
+    if (imageUrl) {
+      const imageValidation = validateImage(imageUrl)
+      if (!imageValidation.isValid) {
+        return res.status(400).json({ 
+          message: 'Invalid image',
+          reason: imageValidation.reason 
+        })
+      }
+    }
+
     // ตรวจสอบว่า item เป็นของ user นี้หรือไม่
     const itemCheck = await query('SELECT user_id FROM items WHERE id=$1', [itemId])
     if (!itemCheck.rowCount) {

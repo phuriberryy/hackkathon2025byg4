@@ -153,7 +153,7 @@ export default function ProfilePage() {
   if (!user) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-16 text-center">
-        <p className="text-lg text-gray-600">กรุณาเข้าสู่ระบบเพื่อดูโปรไฟล์ของคุณ</p>
+        <p className="text-lg text-gray-600">Please log in to view your profile</p>
       </div>
     )
   }
@@ -161,7 +161,7 @@ export default function ProfilePage() {
   if (loading) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-16 text-center">
-        <p className="text-lg text-gray-600">กำลังโหลด...</p>
+        <p className="text-lg text-gray-600">Loading...</p>
       </div>
     )
   }
@@ -188,7 +188,7 @@ export default function ProfilePage() {
                       <User size={20} className="text-primary" />
                     </div>
                     <div>
-                      <p className="text-xs font-medium text-gray-500">คณะ/วิทยาลัย</p>
+                      <p className="text-xs font-medium text-gray-500">Faculty/College</p>
                       <p className="text-base font-semibold text-gray-900">{displayUser.faculty}</p>
                     </div>
                   </div>
@@ -198,7 +198,7 @@ export default function ProfilePage() {
                     <Mail size={20} className="text-primary" />
                 </div>
                   <div>
-                    <p className="text-xs font-medium text-gray-500">อีเมล</p>
+                    <p className="text-xs font-medium text-gray-500">Email</p>
                     <p className="text-base font-semibold text-gray-900">{displayUser.email}</p>
                 </div>
                 </div>
@@ -229,7 +229,7 @@ export default function ProfilePage() {
             }`}
           >
             <Package size={16} />
-            โพสต์ของฉัน
+            My Posts
           </button>
           <button
             onClick={() => setActiveTab('expired')}
@@ -240,7 +240,7 @@ export default function ProfilePage() {
             }`}
           >
             <Clock3 size={16} />
-            หมดอายุแล้ว ({expiredItems.length})
+            Expired ({expiredItems.length})
           </button>
           <button
             onClick={() => setActiveTab('history')}
@@ -251,7 +251,7 @@ export default function ProfilePage() {
             }`}
           >
             <ArrowRightLeft size={16} />
-            ประวัติการแลกเปลี่ยน
+            Exchange History
           </button>
           </div>
         </div>
@@ -322,17 +322,17 @@ export default function ProfilePage() {
                             onClick={() => handleManageItem(item)}
                             disabled={!canEdit}
                             className="flex-1 rounded-full bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                            title={!canEdit ? 'ไม่สามารถแก้ไขได้ เนื่องจากมีคำขอแลกเปลี่ยนที่ยอมรับแล้ว' : ''}
+                            title={!canEdit ? 'Cannot edit because there is an accepted exchange request' : ''}
                           >
-                            จัดการ
+                            Manage
                           </button>
                           <button
                             onClick={() => handleEditItem(item)}
                             disabled={!canEdit}
                             className="flex-1 rounded-full bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                            title={!canEdit ? 'ไม่สามารถแก้ไขได้ เนื่องจากมีคำขอแลกเปลี่ยนที่ยอมรับแล้ว' : ''}
+                            title={!canEdit ? 'Cannot edit because there is an accepted exchange request' : ''}
                           >
-                            แก้ไข
+                            Edit
                           </button>
                         </div>
                       </div>
@@ -348,9 +348,9 @@ export default function ProfilePage() {
               <div className="flex items-start gap-3">
                 <Clock3 size={24} className="text-yellow-600 flex-shrink-0 mt-1" />
                 <div>
-                  <h3 className="text-lg font-semibold text-yellow-900 mb-2">โพสต์ที่หมดอายุแล้ว</h3>
+                  <h3 className="text-lg font-semibold text-yellow-900 mb-2">Expired Posts</h3>
                   <p className="text-sm text-yellow-800">
-                    โพสต์เหล่านี้หมดอายุแล้วแต่ยังไม่ได้รับการแลกเปลี่ยน คุณสามารถลบหรืออัปเดตได้
+                    These posts have expired but have not been exchanged. You can delete or update them.
                   </p>
                 </div>
               </div>
@@ -358,15 +358,15 @@ export default function ProfilePage() {
             {expiredItems.length === 0 ? (
               <div className="rounded-[32px] bg-white p-12 text-center shadow-soft">
                 <Clock3 size={48} className="mx-auto mb-4 text-gray-400" />
-                <p className="text-lg font-semibold text-gray-700">ไม่มีโพสต์ที่หมดอายุ</p>
-                <p className="mt-2 text-sm text-gray-500">โพสต์ที่หมดอายุแล้วจะแสดงที่นี่</p>
+                <p className="text-lg font-semibold text-gray-700">No expired posts</p>
+                <p className="mt-2 text-sm text-gray-500">Expired posts will appear here</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {expiredItems.map((item) => {
                   const views = getItemViews(item.id)
                   const canEdit = canEditItem(item)
-                  const expiredDate = item.available_until ? new Date(item.available_until).toLocaleDateString('th-TH') : 'ไม่ระบุ'
+                  const expiredDate = item.available_until ? new Date(item.available_until).toLocaleDateString('en-US') : 'Not specified'
 
                   return (
                     <div
@@ -387,11 +387,11 @@ export default function ProfilePage() {
                           </div>
                         )}
                         <span className="absolute right-3 top-3 rounded-full bg-red-500 px-3 py-1 text-xs font-semibold text-white shadow-md">
-                          หมดอายุแล้ว
+                          Expired
                         </span>
                         <div className="absolute left-3 top-3 rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-800">
                           <Clock3 size={12} className="inline mr-1" />
-                          หมดอายุ: {expiredDate}
+                          Expired: {expiredDate}
                         </div>
                       </div>
 
@@ -410,7 +410,7 @@ export default function ProfilePage() {
 
                         {/* Info */}
                         <div className="mb-4 space-y-2 text-sm text-gray-600">
-                          <p className="text-xs text-gray-500">ไม่ได้รับการแลกเปลี่ยน</p>
+                          <p className="text-xs text-gray-500">Not exchanged</p>
                           <div className="flex items-center gap-1">
                             <Eye size={16} className="text-gray-400" />
                             <span>{views} views</span>
@@ -423,17 +423,17 @@ export default function ProfilePage() {
                             onClick={() => handleManageItem(item)}
                             disabled={!canEdit}
                             className="flex-1 rounded-full bg-yellow-100 px-4 py-2 text-sm font-semibold text-yellow-800 transition hover:bg-yellow-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                            title={!canEdit ? 'ไม่สามารถแก้ไขได้ เนื่องจากมีคำขอแลกเปลี่ยนที่ยอมรับแล้ว' : ''}
+                            title={!canEdit ? 'Cannot edit because there is an accepted exchange request' : ''}
                           >
-                            จัดการ
+                            Manage
                           </button>
                           <button
                             onClick={() => handleEditItem(item)}
                             disabled={!canEdit}
                             className="flex-1 rounded-full bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                            title={!canEdit ? 'ไม่สามารถแก้ไขได้ เนื่องจากมีคำขอแลกเปลี่ยนที่ยอมรับแล้ว' : ''}
+                            title={!canEdit ? 'Cannot edit because there is an accepted exchange request' : ''}
                           >
-                            แก้ไข
+                            Edit
                           </button>
                         </div>
                       </div>
@@ -466,16 +466,16 @@ export default function ProfilePage() {
                         <p className="mt-2 text-sm text-gray-600">
                           {history.user_role === 'owner' ? (
                             <>
-                              คุณแลกเปลี่ยนกับ <strong>{history.requester_name}</strong>
+                              You exchanged with <strong>{history.requester_name}</strong>
                             </>
                           ) : (
                             <>
-                              คุณแลกเปลี่ยนกับ <strong>{history.owner_name}</strong>
+                              You exchanged with <strong>{history.owner_name}</strong>
                             </>
                           )}
                         </p>
                         <p className="mt-1 text-sm text-gray-500">
-                          CO₂ ที่ลดได้: <strong className="text-primary">{history.co2_reduced} kg</strong>
+                          CO₂ Reduced: <strong className="text-primary">{history.co2_reduced} kg</strong>
                         </p>
                         <p className="mt-2 text-xs text-gray-400">
                           {new Date(history.exchanged_at).toLocaleString('th-TH')}

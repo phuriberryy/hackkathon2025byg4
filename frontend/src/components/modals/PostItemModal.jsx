@@ -37,7 +37,7 @@ export default function PostItemModal({ open, onClose, onSuccess }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!token) {
-      alert('กรุณาเข้าสู่ระบบก่อนโพสต์ของแลกเปลี่ยน')
+      alert('Please log in before posting item for exchange')
       return
     }
     setSubmitting(true)
@@ -65,7 +65,7 @@ export default function PostItemModal({ open, onClose, onSuccess }) {
       })
       setImagePreview(null)
     } catch (err) {
-      alert(err.message || 'ไม่สามารถโพสต์ได้')
+      alert(err.message || 'Failed to post')
     } finally {
       setSubmitting(false)
     }
@@ -94,8 +94,8 @@ export default function PostItemModal({ open, onClose, onSuccess }) {
     <Modal
       open={open}
       onClose={onClose}
-      title="โพสต์ของเพื่อแลกเปลี่ยน"
-      subtitle="โพสต์ของที่คุณต้องการแลกเปลี่ยนกับชาว CMU"
+      title="Post Item for Exchange"
+      subtitle="Post an item you want to exchange with CMU students"
       size="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -212,7 +212,7 @@ export default function PostItemModal({ open, onClose, onSuccess }) {
         {/* Expiration Date */}
         <div>
           <label className="mb-2 block text-sm font-bold text-gray-900">
-            วันหมดอายุของโพสต์ <span className="text-red-500">*</span>
+            Post Expiration Date <span className="text-red-500">*</span>
           </label>
           <div className="flex gap-3">
             <input
@@ -225,7 +225,7 @@ export default function PostItemModal({ open, onClose, onSuccess }) {
             />
           </div>
           <p className="mt-1 text-xs text-gray-500">
-            กำหนดวันที่ต้องการให้โพสต์นี้หมดอายุ (เมื่อครบกำหนด ระบบจะเก็บไว้ในประวัติอัตโนมัติ)
+            Set the date when this post will expire (when expired, the system will automatically keep it in history)
           </p>
         </div>
 
@@ -278,7 +278,7 @@ export default function PostItemModal({ open, onClose, onSuccess }) {
             disabled={submitting}
             className="rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white shadow-md hover:bg-primary-dark transition disabled:opacity-60"
           >
-            {submitting ? 'กำลังบันทึก...' : 'Post Item'}
+            {submitting ? 'Saving...' : 'Post Item'}
           </button>
         </div>
       </form>

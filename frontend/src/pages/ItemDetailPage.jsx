@@ -39,7 +39,7 @@ export default function ItemDetailPage({ onExchangeItem }) {
         setError(null)
       } catch (err) {
         console.error('Failed to fetch item:', err)
-        setError('ไม่พบข้อมูลสินค้า')
+        setError('Item not found')
       } finally {
         setLoading(false)
       }
@@ -55,7 +55,7 @@ export default function ItemDetailPage({ onExchangeItem }) {
   }
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'ไม่ระบุ'
+    if (!dateString) return 'Not specified'
     const date = new Date(dateString)
     return date.toLocaleDateString('th-TH', {
       year: 'numeric',
@@ -77,7 +77,7 @@ export default function ItemDetailPage({ onExchangeItem }) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-10">
         <div className="rounded-2xl bg-white p-12 text-center shadow-md">
-          <p className="text-lg text-gray-600">กำลังโหลดข้อมูล...</p>
+          <p className="text-lg text-gray-600">Loading data...</p>
         </div>
       </div>
     )
@@ -88,13 +88,13 @@ export default function ItemDetailPage({ onExchangeItem }) {
       <div className="mx-auto max-w-4xl px-4 py-10">
         <div className="rounded-2xl bg-white p-12 text-center shadow-md">
           <AlertCircle className="mx-auto mb-4 h-12 w-12 text-red-500" />
-          <p className="text-lg font-semibold text-gray-900">{error || 'ไม่พบข้อมูลสินค้า'}</p>
+          <p className="text-lg font-semibold text-gray-900">{error || 'Item not found'}</p>
           <Link
             to="/"
             className="mt-4 inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white transition hover:bg-primary-dark"
           >
             <ArrowLeft size={16} />
-            กลับไปหน้าหลัก
+            Back to Home
           </Link>
         </div>
       </div>
@@ -114,7 +114,7 @@ export default function ItemDetailPage({ onExchangeItem }) {
         className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-gray-600 transition hover:text-gray-900"
       >
         <ArrowLeft size={18} />
-        <span>กลับไปหน้าหลัก</span>
+        <span>Back to Home</span>
       </Link>
 
       <div className="rounded-2xl bg-white shadow-md">
@@ -143,7 +143,7 @@ export default function ItemDetailPage({ onExchangeItem }) {
                         <circle cx="8.5" cy="8.5" r="1.5"></circle>
                         <polyline points="21 15 16 10 5 21"></polyline>
                       </svg>
-                      <p class="text-xs">ไม่สามารถโหลดรูปภาพ</p>
+                      <p class="text-xs">Failed to load image</p>
                     </div>
                   `
                   parent.appendChild(errorDiv)
@@ -154,7 +154,7 @@ export default function ItemDetailPage({ onExchangeItem }) {
             <div className="flex h-full w-full items-center justify-center bg-gray-100 text-gray-400">
               <div className="text-center">
                 <Package size={64} className="mx-auto mb-2" />
-                <p className="text-sm">ไม่มีรูปภาพ</p>
+                <p className="text-sm">No image</p>
               </div>
             </div>
           )}
@@ -165,12 +165,12 @@ export default function ItemDetailPage({ onExchangeItem }) {
                 {daysRemaining < 0 ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1.5 text-sm font-semibold text-red-700">
                     <Clock3 size={16} />
-                    หมดอายุแล้ว
+                    Expired
                   </span>
                 ) : daysRemaining <= 7 ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-yellow-100 px-3 py-1.5 text-sm font-semibold text-yellow-700">
                     <Clock3 size={16} />
-                    เหลือ {daysRemaining} วัน
+                    {daysRemaining} days remaining
                   </span>
                 ) : null}
               </>
@@ -179,7 +179,7 @@ export default function ItemDetailPage({ onExchangeItem }) {
           <div className="absolute right-4 top-4">
             {isInProgress ? (
               <span className="rounded-full bg-yellow-500 px-4 py-2 text-sm font-semibold text-white shadow-md">
-                กำลังดำเนินการ
+                In progress
               </span>
             ) : (
               <span className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white">
@@ -201,18 +201,13 @@ export default function ItemDetailPage({ onExchangeItem }) {
                 </span>
               )}
               {item.item_condition && (
-                <span className="inline-flex items-center gap-2 rounded-full bg-green-100 px-4 py-1.5 text-sm font-semibold text-gray-700">
+                <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-sm font-semibold text-primary">
                   <Package size={14} />
                   {item.item_condition}
                 </span>
               )}
             </div>
-            <h1 className="mb-2 text-3xl font-bold text-gray-900">{item.title || 'ไม่มีชื่อสินค้า'}</h1>
-            {item.description ? (
-              <p className="text-lg text-gray-600">{item.description}</p>
-            ) : (
-              <p className="text-lg text-gray-400 italic">ไม่มีคำอธิบาย</p>
-            )}
+            <h1 className="mb-2 text-3xl font-bold text-gray-900">{item.title || 'No item name'}</h1>
           </div>
 
           {/* Details Grid */}
@@ -224,19 +219,27 @@ export default function ItemDetailPage({ onExchangeItem }) {
                   <UserIcon size={20} className="text-primary" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-xs text-gray-500">เจ้าของ</p>
-                  <p className="font-semibold text-gray-900">{item.owner_name || 'ไม่ระบุ'}</p>
+                  <p className="text-xs text-gray-500">Owner</p>
+                  <p className="font-semibold text-gray-900">{item.owner_name || 'Not specified'}</p>
                 </div>
               </div>
               <div className="mt-2 border-t border-gray-200 pt-2">
-                <p className="text-xs text-gray-500">คณะ</p>
-                <p className="text-sm font-medium text-gray-700">{item.owner_faculty || 'ไม่ระบุ'}</p>
+                <p className="text-xs text-gray-500">Faculty</p>
+                <p className="text-sm font-medium text-gray-700">{item.owner_faculty || 'Not specified'}</p>
               </div>
               <div className="mt-2 border-t border-gray-200 pt-2">
-                <p className="text-xs text-gray-500">อีเมล</p>
-                <p className="text-sm font-medium text-gray-700">{item.owner_email || 'ไม่ระบุ'}</p>
+                <p className="text-xs text-gray-500">Email</p>
+                <p className="text-sm font-medium text-gray-700">{item.owner_email || 'Not specified'}</p>
               </div>
             </div>
+
+            {/* Description */}
+            {item.description && (
+              <div className="rounded-xl bg-gray-50 p-4">
+                <p className="mb-2 text-xs text-gray-500">Description</p>
+                <p className="text-sm text-gray-700">{item.description}</p>
+              </div>
+            )}
 
             {/* Pickup Location */}
             <div className="flex items-center gap-3 rounded-xl bg-gray-50 p-4">
@@ -244,8 +247,8 @@ export default function ItemDetailPage({ onExchangeItem }) {
                 <MapPin size={20} className="text-primary" />
               </div>
               <div>
-                <p className="text-xs text-gray-500">สถานที่รับ</p>
-                <p className="font-semibold text-gray-900">{item.pickup_location || 'ไม่ระบุ'}</p>
+                <p className="text-xs text-gray-500">Pickup Location</p>
+                <p className="font-semibold text-gray-900">{item.pickup_location || 'Not specified'}</p>
               </div>
             </div>
 
@@ -255,7 +258,7 @@ export default function ItemDetailPage({ onExchangeItem }) {
                 <Calendar size={20} className="text-primary" />
               </div>
               <div>
-                <p className="text-xs text-gray-500">ใช้ได้จนถึง</p>
+                <p className="text-xs text-gray-500">Available until</p>
                 <p className="font-semibold text-gray-900">{formatDate(item.available_until)}</p>
               </div>
             </div>
@@ -277,7 +280,7 @@ export default function ItemDetailPage({ onExchangeItem }) {
                 <Calendar size={20} className="text-primary" />
               </div>
               <div>
-                <p className="text-xs text-gray-500">วันที่โพสต์</p>
+                <p className="text-xs text-gray-500">Posted date</p>
                 <p className="font-semibold text-gray-900">{formatDate(item.created_at)}</p>
               </div>
             </div>
@@ -285,8 +288,8 @@ export default function ItemDetailPage({ onExchangeItem }) {
 
           {/* Looking For */}
           <div className="mb-6 rounded-xl bg-yellow-50 p-4">
-            <p className="mb-2 text-sm font-semibold text-yellow-900">กำลังมองหา:</p>
-            <p className="text-yellow-800">{item.looking_for || 'ไม่ระบุ'}</p>
+            <p className="mb-2 text-sm font-semibold text-yellow-900">Looking for:</p>
+            <p className="text-yellow-800">{item.looking_for || 'Not specified'}</p>
           </div>
 
           {/* Action Buttons */}
@@ -296,18 +299,18 @@ export default function ItemDetailPage({ onExchangeItem }) {
                 onClick={handleExchange}
                 className="flex-1 rounded-full bg-primary px-6 py-3 text-base font-semibold text-white shadow-md transition hover:bg-primary-dark"
               >
-                ขอแลกเปลี่ยน
+                Request Exchange
               </button>
             )}
             {isOwner && (
               <div className="flex-1 rounded-xl bg-blue-50 p-4 text-center">
-                <p className="text-sm font-semibold text-blue-900">นี่คือสินค้าของคุณ</p>
-                <p className="mt-1 text-xs text-blue-700">คุณสามารถจัดการสินค้านี้ได้ที่หน้า Profile</p>
+                <p className="text-sm font-semibold text-blue-900">This is your item</p>
+                <p className="mt-1 text-xs text-blue-700">You can manage this item on the Profile page</p>
               </div>
             )}
             {isInProgress && (
               <div className="flex-1 rounded-xl bg-yellow-50 p-4 text-center">
-                <p className="text-sm font-semibold text-yellow-900">สินค้านี้กำลังอยู่ในกระบวนการแลกเปลี่ยน</p>
+                <p className="text-sm font-semibold text-yellow-900">This item is currently in the exchange process</p>
               </div>
             )}
           </div>

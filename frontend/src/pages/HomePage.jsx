@@ -16,8 +16,12 @@ import {
   MapPin,
   User as UserIcon,
   Eye,
+  Package,
+  TrendingUp,
+  CheckCircle,
+  BarChart3,
 } from 'lucide-react'
-import { itemsApi } from '../lib/api'
+import { itemsApi, statisticsApi } from '../lib/api'
 
 export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
   const navigate = useNavigate()
@@ -26,6 +30,8 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
   const [selectedCondition, setSelectedCondition] = useState('All Conditions')
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
+  const [statistics, setStatistics] = useState(null)
+  const [loadingStats, setLoadingStats] = useState(false)
 
   const categoryOptions = [
     { value: 'All Categories', label: 'All Categories' },
@@ -58,13 +64,24 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
     itemsApi
       .list()
       .then((data) => {
-        console.log('Items loaded:', data)
-        console.log('Items with in_progress status:', data.filter(item => item.status === 'in_progress'))
         setItems(data)
       })
       .catch(() => setItems([]))
       .finally(() => setLoading(false))
   }, [refreshKey])
+
+  useEffect(() => {
+    setLoadingStats(true)
+    statisticsApi
+      .getStatistics()
+      .then((data) => {
+        setStatistics(data)
+      })
+      .catch((err) => {
+        console.error('Failed to load statistics:', err)
+      })
+      .finally(() => setLoadingStats(false))
+  }, [])
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
@@ -109,7 +126,15 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
               <span className="font-semibold text-gray-900">No money, no waste, just community.</span>
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <button className="inline-flex items-center gap-3 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark">
+              <button 
+                onClick={() => {
+                  const itemsSection = document.getElementById('items-section')
+                  if (itemsSection) {
+                    itemsSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }
+                }}
+                className="inline-flex items-center gap-3 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark"
+              >
                 <span>Browse Items</span>
                 <ArrowRight size={18} />
               </button>
@@ -140,8 +165,130 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
         </div>
       </section>
 
+      {/* STATISTICS DASHBOARD */}
+      {loadingStats ? (
+        <section className="mb-16">
+          <div className="rounded-2xl bg-white p-12 text-center shadow-soft">
+            <p className="text-sm text-gray-500">Loading statistics...</p>
+          </div>
+        </section>
+      ) : statistics ? (
+        <section className="mb-16">
+          <div className="mb-6">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-white px-4 py-1 text-xs font-semibold uppercase tracking-wide text-primary shadow-sm">
+              <BarChart3 size={14} />
+              Platform Statistics
+            </div>
+            <h2 className="text-3xl font-bold text-gray-900">Community Impact</h2>
+            <p className="mt-2 text-lg text-gray-600">See how we're making a difference together</p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {/* Total Users */}
+            <div className="group relative overflow-hidden rounded-2xl border border-white/60 bg-gradient-to-br from-blue-50 to-blue-100/50 p-6 shadow-soft transition hover:-translate-y-1 hover:shadow-card">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/20 text-blue-600">
+                  <Users size={24} />
+                </div>
+                <div className="rounded-full bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-700">
+                  Active
+                </div>
+              </div>
+              <p className="text-3xl font-bold text-gray-900">{statistics.totalUsers.toLocaleString()}</p>
+              <p className="mt-1 text-sm font-medium text-gray-600">Total Users</p>
+              <p className="mt-2 text-xs text-gray-500">CMU students joined</p>
+            </div>
+
+            {/* Total Items */}
+            <div className="group relative overflow-hidden rounded-2xl border border-white/60 bg-gradient-to-br from-green-50 to-green-100/50 p-6 shadow-soft transition hover:-translate-y-1 hover:shadow-card">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-green-500/20 text-green-600">
+                  <Package size={24} />
+                </div>
+                <div className="rounded-full bg-green-500/10 px-3 py-1 text-xs font-semibold text-green-700">
+                  {statistics.activeItems} Active
+                </div>
+              </div>
+              <p className="text-3xl font-bold text-gray-900">{statistics.totalItems.toLocaleString()}</p>
+              <p className="mt-1 text-sm font-medium text-gray-600">Total Items</p>
+              <p className="mt-2 text-xs text-gray-500">{statistics.activeItems} available now</p>
+            </div>
+
+            {/* Successful Exchanges */}
+            <div className="group relative overflow-hidden rounded-2xl border border-white/60 bg-gradient-to-br from-purple-50 to-purple-100/50 p-6 shadow-soft transition hover:-translate-y-1 hover:shadow-card">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-500/20 text-purple-600">
+                  <CheckCircle size={24} />
+                </div>
+                <div className="rounded-full bg-purple-500/10 px-3 py-1 text-xs font-semibold text-purple-700">
+                  Completed
+                </div>
+              </div>
+              <p className="text-3xl font-bold text-gray-900">{statistics.totalExchanges.toLocaleString()}</p>
+              <p className="mt-1 text-sm font-medium text-gray-600">Successful Exchanges</p>
+              <p className="mt-2 text-xs text-gray-500">Items exchanged</p>
+            </div>
+
+            {/* CO₂ Reduced */}
+            <div className="group relative overflow-hidden rounded-2xl border border-white/60 bg-gradient-to-br from-emerald-50 to-emerald-100/50 p-6 shadow-soft transition hover:-translate-y-1 hover:shadow-card">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/20 text-emerald-600">
+                  <Leaf size={24} />
+                </div>
+                <div className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700">
+                  <TrendingUp size={12} className="inline mr-1" />
+                  Impact
+                </div>
+              </div>
+              <p className="text-3xl font-bold text-gray-900">{statistics.totalCO2Reduced.toLocaleString()}</p>
+              <p className="mt-1 text-sm font-medium text-gray-600">kg CO₂ Reduced</p>
+              <p className="mt-2 text-xs text-gray-500">Environmental impact</p>
+            </div>
+          </div>
+
+          {/* Additional Stats Row */}
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="rounded-2xl border border-white/60 bg-gradient-to-br from-orange-50 to-orange-100/50 p-6 shadow-soft">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/20 text-orange-600">
+                  <RefreshCcw size={20} />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-gray-900">{statistics.totalRequests.toLocaleString()}</p>
+                  <p className="text-sm font-medium text-gray-600">Total Exchange Requests</p>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
+                <Clock3 size={14} />
+                <span>{statistics.pendingRequests} pending approval</span>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/60 bg-gradient-to-br from-teal-50 to-teal-100/50 p-6 shadow-soft">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-500/20 text-teal-600">
+                  <Zap size={20} />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {statistics.totalExchanges > 0 
+                      ? ((statistics.totalExchanges / statistics.totalUsers) * 100).toFixed(1)
+                      : '0'}%
+                  </p>
+                  <p className="text-sm font-medium text-gray-600">Exchange Rate</p>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
+                <Users size={14} />
+                <span>Average exchanges per user</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       {/* ITEMS */}
-      <section>
+      <section id="items-section">
         <div className="mb-8">
           <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-white px-4 py-1 text-xs font-semibold uppercase tracking-wide text-primary shadow-sm">
             <RefreshCcw size={14} />
@@ -202,14 +349,14 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
 
             <button className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark">
               <Search size={16} />
-              <span>ค้นหา</span>
+              <span>Search</span>
             </button>
 
             <button
               onClick={onPostItem}
-              className="inline-flex items-center gap-2 rounded-full bg-[#0E8B43] px-6 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-[#0B6C33]"
+              className="inline-flex items-center gap-2 rounded-full bg-primary px-8 py-4 text-base font-semibold text-white shadow-card transition hover:bg-primary-dark"
             >
-              <Plus size={18} />
+              <Plus size={20} />
               Post Item
             </button>
           </div>
@@ -230,10 +377,6 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {filteredItems.map((item) => {
             const isInProgress = item.status === 'in_progress'
-            // Debug log
-            if (isInProgress) {
-              console.log('Item in progress:', item.id, item.title, item.status)
-            }
             return (
             <article
               key={item.id}
@@ -252,7 +395,7 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
                   alt={item.title}
                   className="h-full w-full object-cover"
                 />
-                {/* Badge ซ้ายบน: เหลือ X วัน หรือ หมดอายุแล้ว */}
+                {/* Left badge: X days remaining or expired */}
                 <div className="absolute left-4 top-4">
                   {(() => {
                     if (!item.available_until) {
@@ -267,24 +410,24 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
                       return (
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1.5 text-sm font-semibold text-red-700">
                           <Clock3 size={16} />
-                          หมดอายุแล้ว
+                          Expired
                         </span>
                       )
                     } else if (diffDays <= 7) {
                       return (
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-yellow-100 px-3 py-1.5 text-sm font-semibold text-yellow-700">
                           <Clock3 size={16} />
-                          เหลือ {diffDays} วัน
+                          {diffDays} days remaining
                         </span>
                       )
                     }
                     return null
                   })()}
                 </div>
-                {/* Badge ขวาบน: Exchange หรือ กำลังดำเนินการ */}
+                {/* Right badge: Exchange or in progress */}
                 {isInProgress ? (
                   <span className="absolute right-4 top-4 rounded-full bg-yellow-500 px-3 py-1.5 text-sm font-semibold text-white shadow-md">
-                    กำลังดำเนินการ
+                    In progress
                   </span>
                 ) : (
                   <span className="absolute right-4 top-4 rounded-full bg-primary px-3 py-1.5 text-sm font-semibold text-white">
@@ -332,7 +475,7 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
                     className="flex-1 rounded-lg border-2 border-primary bg-white px-4 py-2.5 text-sm font-semibold text-primary transition hover:bg-primary/10"
                   >
                     <Eye size={16} className="mx-auto" />
-                    <span className="mt-1 block text-xs">ดูรายละเอียด</span>
+                    <span className="mt-1 block text-xs">View Details</span>
                   </button>
                   {isInProgress ? (
                     <button
@@ -340,7 +483,7 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
                       className="flex-1 rounded-lg bg-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-500 shadow-md cursor-not-allowed"
                     >
                       <RefreshCcw size={16} className="mx-auto" />
-                      <span className="mt-1 block text-xs">กำลังดำเนินการ</span>
+                      <span className="mt-1 block text-xs">In progress</span>
                     </button>
                   ) : (
                     <button

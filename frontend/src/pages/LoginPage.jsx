@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('student@cmu.ac.th')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
@@ -13,7 +13,7 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const { login, token, loading } = useAuth()
 
-  // ถ้า login แล้ว ให้ redirect ไปหน้า home
+  // If logged in, redirect to home page
   useEffect(() => {
     if (!loading && token) {
       navigate('/', { replace: true })
@@ -28,7 +28,7 @@ export default function LoginPage() {
       await login(email, password)
       navigate('/')
     } catch (err) {
-      setError(err.message || 'ไม่สามารถเข้าสู่ระบบได้')
+      setError(err.message || 'Failed to log in')
     } finally {
       setSubmitting(false)
     }
@@ -39,17 +39,17 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="rounded-2xl bg-white p-8 shadow-lg">
           <h1 className="mb-2 text-center text-2xl font-bold text-gray-900">
-            เข้าสู่ระบบ
+            Log In
           </h1>
           <p className="mb-6 text-center text-sm text-gray-700">
-            กรอกอีเมลและรหัสผ่านเพื่อเข้าใช้งาน
+            Enter your email and password to log in
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email Input */}
             <div>
               <label className="mb-2 block text-sm font-semibold text-gray-900">
-                อีเมล CMU
+                CMU Account
               </label>
               <div className="relative">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
@@ -59,7 +59,7 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="student@cmu.ac.th"
+                  placeholder="Enter CMU email"
                   className="w-full rounded-xl border-0 bg-[#E8F4EA] px-4 py-3 pl-10 text-gray-900 placeholder:text-gray-500 focus:ring-2 focus:ring-primary focus:ring-offset-0"
                   required
                 />
@@ -69,7 +69,7 @@ export default function LoginPage() {
             {/* Password Input */}
             <div>
               <label className="mb-2 block text-sm font-semibold text-gray-900">
-                รหัสผ่าน
+                Password
               </label>
               <div className="relative">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
@@ -93,8 +93,8 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Remember Me & Forgot Password */}
-            <div className="flex items-center justify-between">
+            {/* Remember Me */}
+            <div className="flex items-center">
               <label className="flex items-center gap-2 text-sm text-gray-700">
                 <input
                   type="checkbox"
@@ -102,14 +102,8 @@ export default function LoginPage() {
                   onChange={(e) => setRememberMe(e.target.checked)}
                   className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                 />
-                <span>จดจำฉันไว้</span>
+                <span>Remember me</span>
               </label>
-              <Link
-                to="/forgot-password"
-                className="text-sm font-semibold text-primary hover:underline"
-              >
-                ลืมรหัสผ่าน?
-              </Link>
             </div>
 
             {/* Login Button */}
@@ -118,7 +112,7 @@ export default function LoginPage() {
               disabled={submitting}
               className="w-full rounded-xl bg-primary px-6 py-3 text-base font-semibold text-white shadow-md transition hover:bg-primary-dark disabled:opacity-60"
             >
-              {submitting ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
+              {submitting ? 'Logging in...' : 'Log In'}
             </button>
           </form>
           {error && <p className="mt-4 text-center text-sm text-red-500">{error}</p>}
@@ -126,18 +120,18 @@ export default function LoginPage() {
           {/* Separator */}
           <div className="my-6 flex items-center gap-4">
             <div className="h-px flex-1 bg-gray-200" />
-            <span className="text-sm text-gray-500">หรือ</span>
+            <span className="text-sm text-gray-500">or</span>
             <div className="h-px flex-1 bg-gray-200" />
           </div>
 
           {/* Registration Link */}
           <p className="text-center text-sm text-gray-700">
-            ยังไม่มีบัญชี?{' '}
+            Don't have an account?{' '}
             <Link
               to="/register"
               className="font-semibold text-primary hover:underline"
             >
-              สมัครสมาชิก
+              Sign up
             </Link>
           </p>
         </div>

@@ -95,14 +95,27 @@ export const verifyEmailConnection = async () => {
   }
 }
 
-// แปลง HTML เป็น plain text
+// แปลง HTML เป็น plain text ที่ดีขึ้น
 const htmlToText = (html) => {
-  return html
+  let text = html
     .replace(/<style[^>]*>.*?<\/style>/gis, '')
     .replace(/<script[^>]*>.*?<\/script>/gis, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<\/h[1-6]>/gi, '\n\n')
+    .replace(/<a[^>]*href=["']([^"']+)["'][^>]*>([^<]+)<\/a>/gi, '$2 ($1)')
+    .replace(/<strong[^>]*>([^<]+)<\/strong>/gi, '$1')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/\n{3,}/g, '\n\n')
     .trim()
+  
+  return text
 }
 
 // สร้าง Message-ID ที่ถูกต้อง
@@ -135,6 +148,9 @@ export const sendEmail = async ({ to, subject, html }) => {
       ? env.emailFrom
       : env.emailUser
 
+    // Format Date header (RFC 2822 format)
+    const dateHeader = new Date().toUTCString()
+
     const info = await transporter.sendMail({
       from: `"CMU ShareCycle" <${fromEmail}>`,
       to,
@@ -144,23 +160,29 @@ export const sendEmail = async ({ to, subject, html }) => {
       replyTo: fromEmail, // ตั้งค่า Reply-To
       // Email headers เพื่อลดการถูกจัดเป็น spam
       headers: {
+        'Date': dateHeader, // สำคัญมาก - ต้องมี Date header
         'Message-ID': generateMessageId(),
+        'Precedence': 'normal', // บอกว่าเป็น transactional email (ไม่ใช่ bulk marketing)
         'X-Priority': '3', // Normal priority (1=highest, 3=normal, 5=lowest)
         'X-MSMail-Priority': 'Normal',
         'Importance': 'normal',
         'X-Mailer': 'CMU ShareCycle Platform',
-        'X-Auto-Response-Suppress': 'All',
-        'List-Unsubscribe': `<mailto:${fromEmail}?subject=unsubscribe>`,
-        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        'X-Auto-Response-Suppress': 'All', // ป้องกัน auto-reply
         'Organization': 'Chiang Mai University',
         'Return-Path': fromEmail,
         'X-Entity-Ref-ID': `cmu-sharecycle-${Date.now()}`,
         'MIME-Version': '1.0',
         'Content-Type': 'text/html; charset=UTF-8',
         'Content-Transfer-Encoding': 'quoted-printable',
+        'X-Originating-IP': '[127.0.0.1]', // สำหรับ development
       },
       // ตั้งค่า priority
       priority: 'normal',
+      // เพิ่ม envelope เพื่อให้แน่ใจว่า from address ถูกต้อง
+      envelope: {
+        from: fromEmail,
+        to: [to],
+      },
     })
 
     console.log('✅ Email sent successfully:', info.messageId)
