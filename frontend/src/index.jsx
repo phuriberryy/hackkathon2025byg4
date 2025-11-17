@@ -12,7 +12,7 @@ root.render(
   //     <App />
   //   </BrowserRouter>
   // </React.StrictMode>
-    <BrowserRouter basename={process.env.PUBLIC_URL || ''}>
+    <BrowserRouter>
       <App />
     </BrowserRouter>
 )
