@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { io } from 'socket.io-client'
-import { Send, MessageCircle, Loader2, Check, X, QrCode, CheckCheck } from 'lucide-react'
+import { Send, MessageCircle, Loader2, Check, X, QrCode, CheckCheck, MapPin } from 'lucide-react'
 import Modal from '../ui/Modal'
 import { API_BASE, chatApi } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
@@ -506,16 +506,24 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                 <div className="mb-3 flex items-center justify-between gap-2 border-b border-gray-100 pb-2">
                   <div className="flex items-center gap-2">
                   <MessageCircle size={18} className="text-primary" />
-                  <div>
+                  <div className="flex-1">
                     <p className="text-sm font-semibold">{activeChat?.participant_name || 'CMU Student'}</p>
                     <p className="text-xs text-gray-500">{activeChat?.participant_email || ''}</p>
+                    {activeChat?.itemTitle && (
+                      <div className="mt-1 flex items-center gap-2">
+                        <span className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
+                          {activeChat.itemTitle}
+                        </span>
+                        {activeChat?.itemPickupLocation && (
+                          <span className="flex items-center gap-1 text-[11px] text-gray-600">
+                            <MapPin size={12} />
+                            {activeChat.itemPickupLocation}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
-                  {activeChat?.itemTitle && (
-                    <span className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
-                      {activeChat.itemTitle}
-                    </span>
-                  )}
                 </div>
 
                 {actionError && (
