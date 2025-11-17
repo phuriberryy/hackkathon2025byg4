@@ -6,7 +6,6 @@ import {
   XCircle,
   MessageCircle,
   Clock,
-  User,
   ArrowLeft,
   Package,
   MapPin,
@@ -86,12 +85,6 @@ export default function ExchangeRequestDetailPage() {
       
       // Update state
       setExchangeRequest(updatedData)
-      
-      // Check if both parties have accepted (status is 'chatting' or both parties accepted)
-      const bothAccepted = bothAcceptedFromResponse !== undefined 
-        ? bothAcceptedFromResponse 
-        : (updatedData.owner_accepted && updatedData.requester_accepted)
-      const isChatting = statusFromResponse === 'chatting' || updatedData.status === 'chatting'
       
       // Don't show alert or redirect - let user click "Start Chat" button
     } catch (err) {

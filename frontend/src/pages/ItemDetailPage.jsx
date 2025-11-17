@@ -8,8 +8,6 @@ import {
   Package,
   Zap,
   Clock3,
-  CheckCircle,
-  XCircle,
   AlertCircle,
 } from 'lucide-react'
 import { itemsApi } from '../lib/api'
@@ -18,8 +16,7 @@ import { calculateItemCO2 } from '../utils/co2Calculator'
 
 export default function ItemDetailPage({ onExchangeItem }) {
   const { itemId } = useParams()
-  const navigate = useNavigate()
-  const { token, user } = useAuth()
+  const { user } = useAuth()
   const [item, setItem] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)

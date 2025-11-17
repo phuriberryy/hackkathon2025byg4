@@ -3,7 +3,6 @@ import {
   ArrowRightLeft,
   User,
   Mail,
-  MapPin,
   Package,
   CheckCircle,
   Image as ImageIcon,
