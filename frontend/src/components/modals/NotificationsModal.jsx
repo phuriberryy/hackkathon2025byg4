@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Bell, Clock3, CheckCircle, XCircle, MessageCircle, RefreshCw, ArrowRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Modal from '../ui/Modal'
-import { notificationApi, exchangeApi } from '../../lib/api'
+import { notificationApi } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 
 export default function NotificationsModal({ open, onClose, onUnreadChange }) {
@@ -10,7 +10,6 @@ export default function NotificationsModal({ open, onClose, onUnreadChange }) {
   const navigate = useNavigate()
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(false)
-  const [processing, setProcessing] = useState(new Set())
 
   useEffect(() => {
     const fetchNotifications = async () => {
@@ -31,20 +30,6 @@ export default function NotificationsModal({ open, onClose, onUnreadChange }) {
     fetchNotifications()
   }, [open, token, onUnreadChange])
 
-  const handleMarkRead = async (notificationId) => {
-    if (!token) return
-
-    try {
-      await notificationApi.markNotificationRead(token, notificationId)
-      setNotifications(
-        notifications.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
-      )
-      const unreadCount = notifications.filter((n) => !n.read && n.id !== notificationId).length
-      onUnreadChange?.(unreadCount)
-    } catch (err) {
-      console.error('Failed to mark notification as read:', err)
-    }
-  }
 
   const handleViewExchangeRequest = (notification) => {
     const metadata = notification.metadata || {}
@@ -56,15 +41,6 @@ export default function NotificationsModal({ open, onClose, onUnreadChange }) {
     }
   }
 
-  const handleOpenChat = (notification) => {
-    const metadata = notification.metadata || {}
-    const chatId = metadata.chatId || metadata.chat_id
-
-    if (chatId) {
-      onClose()
-      navigate(`/chat/${chatId}`)
-    }
-  }
 
   const formatTimeAgo = (date) => {
     const now = new Date()
@@ -113,7 +89,6 @@ export default function NotificationsModal({ open, onClose, onUnreadChange }) {
             notifications.map((notification) => {
               const isExchangeRequest = notification.type === 'exchange_request' || notification.type === 'exchange_accepted'
               const isCompleted = notification.type === 'exchange_completed'
-              const metadata = notification.metadata || {}
 
               return (
                 <div

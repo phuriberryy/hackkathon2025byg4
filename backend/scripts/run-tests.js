@@ -2,7 +2,7 @@
 
 /**
  * ShareCycle Backend - Automated Test Runner
- * Runs a series of API tests to validate core functionality
+ * Runs a series of API tests to validate core functionality using real user/item data
  * 
  * Usage: node scripts/run-tests.js
  */
@@ -29,7 +29,7 @@ class TestRunner {
     }
   }
 
-  async test(name, method, endpoint, body = null, expectedStatus = 200, shouldHaveToken = false) {
+  async test(name, method, endpoint, body = null, expectedStatus = 200, tokenKey = null) {
     testResults.total++
     const url = `${this.baseUrl}${endpoint}`
     const options = {
@@ -37,8 +37,9 @@ class TestRunner {
       headers: { ...this.headers },
     }
 
-    if (shouldHaveToken && tokens.user1) {
-      options.headers.Authorization = `Bearer ${tokens.user1}`
+    // Support multiple user tokens
+    if (tokenKey && tokens[tokenKey]) {
+      options.headers.Authorization = `Bearer ${tokens[tokenKey]}`
     }
 
     if (body) {
@@ -82,19 +83,20 @@ class TestRunner {
 }
 
 async function runTests() {
-  console.log(info('\n=== ShareCycle Backend Test Suite ===\n'))
+  console.log(info('\n=== ShareCycle Backend Test Suite (Using Real Data) ===\n'))
 
   const runner = new TestRunner(BASE_URL)
 
-  // Test 1: Register User 1
+  // Test 1: Register User 1 (Seller)
   console.log(info('\n--- Authentication Tests ---'))
+  const timestamp = Date.now()
   const registerUser1 = await runner.test(
-    'Register User 1',
+    'Register User 1 (Seller)',
     'POST',
     '/api/auth/register',
     {
-      name: 'Test User 1',
-      email: `user${Date.now()}@cmu.ac.th`,
+      name: `Seller ${timestamp}`,
+      email: `seller${timestamp}@cmu.ac.th`,
       password: 'TestPassword123',
       faculty: 'Engineering',
     },
@@ -102,16 +104,17 @@ async function runTests() {
   )
   if (registerUser1 && registerUser1.user) {
     createdIds.user1 = registerUser1.user.id
+    createdIds.user1Email = registerUser1.user.email
   }
 
-  // Test 2: Register User 2
+  // Test 2: Register User 2 (Buyer/Requester)
   const registerUser2 = await runner.test(
-    'Register User 2',
+    'Register User 2 (Buyer)',
     'POST',
     '/api/auth/register',
     {
-      name: 'Test User 2',
-      email: `user${Date.now() + 1}@cmu.ac.th`,
+      name: `Buyer ${timestamp}`,
+      email: `buyer${timestamp}@cmu.ac.th`,
       password: 'TestPassword123',
       faculty: 'Business',
     },
@@ -119,112 +122,180 @@ async function runTests() {
   )
   if (registerUser2 && registerUser2.user) {
     createdIds.user2 = registerUser2.user.id
+    createdIds.user2Email = registerUser2.user.email
   }
 
-  // Test 3: Login User 1
-  const loginResponse = await runner.test(
-    'Login User 1',
+  // Test 3: Login User 1 (Seller)
+  const loginUser1 = await runner.test(
+    'Login User 1 (Seller)',
     'POST',
     '/api/auth/login',
     {
-      email: registerUser1?.user?.email || 'user@cmu.ac.th',
+      email: createdIds.user1Email,
       password: 'TestPassword123',
     },
     200
   )
-  if (loginResponse && loginResponse.token) {
-    tokens.user1 = loginResponse.token
+  if (loginUser1 && loginUser1.token) {
+    tokens.user1 = loginUser1.token
   }
 
-  // Test 4: Get All Items (Public)
-  console.log(info('\n--- Item Tests ---'))
-  await runner.test('Get All Items', 'GET', '/api/items', null, 200)
+  // Test 4: Login User 2 (Buyer)
+  const loginUser2 = await runner.test(
+    'Login User 2 (Buyer)',
+    'POST',
+    '/api/auth/login',
+    {
+      email: createdIds.user2Email,
+      password: 'TestPassword123',
+    },
+    200
+  )
+  if (loginUser2 && loginUser2.token) {
+    tokens.user2 = loginUser2.token
+  }
 
-  // Test 5: Create Item
-  const createItem = await runner.test(
-    'Create Item',
+  // Test 5: Get All Items (Public)
+  console.log(info('\n--- Item Tests ---'))
+  const allItems = await runner.test('Get All Items', 'GET', '/api/items', null, 200)
+
+  // Test 6: Create Item by User 1 (Real Item)
+  console.log(info('\n--- Creating Real Items ---'))
+  const itemData = {
+    title: `Mountain Bike ${timestamp}`,
+    category: 'sports',
+    itemCondition: 'good',
+    description: 'Barely used mountain bike in excellent condition',
+    availableUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    pickupLocation: 'CMU Campus Building A',
+    lookingFor: 'skateboard or roller skates',
+  }
+
+  const createdItem = await runner.test(
+    'Create Real Item by User 1',
     'POST',
     '/api/items',
-    {
-      title: 'Test Mountain Bike',
-      category: 'sports',
-      itemCondition: 'good',
-      description: 'Test bike for exchange',
-      lookupLocation: 'CMU',
-    },
+    itemData,
     201,
-    true
+    'user1'
   )
-  if (createItem && createItem.id) {
-    createdIds.item = createItem.id
+  if (createdItem && createdItem.id) {
+    createdIds.itemUser1 = createdItem.id
+    console.log(info(`  Item ID: ${createdItem.id}`))
   }
 
-  // Test 6: Get Item By ID
-  if (createdIds.item) {
+  // Test 7: Create Item by User 2 (Real Item for exchange)
+  const itemData2 = {
+    title: `Skateboard ${timestamp}`,
+    category: 'sports',
+    itemCondition: 'like-new',
+    description: 'Brand new skateboard, never used',
+    availableUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    pickupLocation: 'CMU Campus Building B',
+    lookingFor: 'bike or sports equipment',
+  }
+
+  const createdItem2 = await runner.test(
+    'Create Real Item by User 2',
+    'POST',
+    '/api/items',
+    itemData2,
+    201,
+    'user2'
+  )
+  if (createdItem2 && createdItem2.id) {
+    createdIds.itemUser2 = createdItem2.id
+    console.log(info(`  Item ID: ${createdItem2.id}`))
+  }
+
+  // Test 8: Get Created Item By ID
+  if (createdIds.itemUser1) {
     await runner.test(
-      'Get Item By ID',
+      'Get Created Item By ID',
       'GET',
-      `/api/items/${createdIds.item}`,
+      `/api/items/${createdIds.itemUser1}`,
       null,
       200
     )
   }
 
-  // Test 7: Create Exchange Request
-  console.log(info('\n--- Exchange Tests ---'))
-  if (createdIds.item) {
+  // Test 9: Create Exchange Request with Real Item Data
+  console.log(info('\n--- Exchange Tests (Using Real Items) ---'))
+  if (createdIds.itemUser1 && createdIds.itemUser2) {
     const exchangeRequest = await runner.test(
-      'Create Exchange Request',
+      'Create Exchange Request (User 2 requesting User 1 item)',
       'POST',
       '/api/exchange',
       {
-        itemId: createdIds.item,
-        message: 'I am interested in this item',
-        requesterItemName: 'Skateboard',
-        requesterItemCategory: 'sports',
-        requesterItemCondition: 'good',
+        itemId: createdIds.itemUser1,
+        message: 'I have a skateboard and would like to exchange it for your bike',
+        requesterItemName: itemData2.title,
+        requesterItemCategory: itemData2.category,
+        requesterItemCondition: itemData2.itemCondition,
+        requesterItemDescription: itemData2.description,
+        requesterPickupLocation: itemData2.pickupLocation,
       },
       201,
-      true
+      'user2'
     )
     if (exchangeRequest && exchangeRequest.id) {
       createdIds.exchangeRequest = exchangeRequest.id
+      console.log(info(`  Exchange Request ID: ${exchangeRequest.id}`))
     }
   }
 
-  // Test 8: Get My Exchange Requests
+  // Test 10: Get My Exchange Requests (User 1 - should see as receiver)
   await runner.test(
-    'Get My Exchange Requests',
+    'Get Exchange Requests (User 1 as Receiver)',
     'GET',
     '/api/exchange/my-requests',
     null,
     200,
-    true
+    'user1'
   )
 
-  // Test 9: Create Chat
-  console.log(info('\n--- Chat Tests ---'))
-  if (createdIds.item && createdIds.user2) {
+  // Test 11: Create Chat (User 1 initiates chat with User 2 about the exchange)
+  console.log(info('\n--- Chat Tests (Using Real Users/Items) ---'))
+  if (createdIds.itemUser1 && createdIds.user2 && createdIds.exchangeRequest) {
     const createChat = await runner.test(
-      'Create Chat',
+      'Create Chat (between User 1 & 2)',
       'POST',
       '/api/chats',
       {
         participantId: createdIds.user2,
-        itemId: createdIds.item,
+        itemId: createdIds.itemUser1,
+        exchangeRequestId: createdIds.exchangeRequest,
       },
       201,
-      true
+      'user1'
     )
     if (createChat && createChat.id) {
       createdIds.chat = createChat.id
+      console.log(info(`  Chat ID: ${createChat.id}`))
     }
   }
 
-  // Test 10: Get All Chats
-  await runner.test('Get All Chats', 'GET', '/api/chats', null, 200, true)
+  // Test 12: Get All Chats (User 1)
+  await runner.test(
+    'Get All Chats (User 1)',
+    'GET',
+    '/api/chats',
+    null,
+    200,
+    'user1'
+  )
 
-  // Test 11: Error - Unauthorized Access
+  // Test 13: Get All Chats (User 2)
+  await runner.test(
+    'Get All Chats (User 2)',
+    'GET',
+    '/api/chats',
+    null,
+    200,
+    'user2'
+  )
+
+  // Test 14: Error - Unauthorized Access
   console.log(info('\n--- Error Handling Tests ---'))
   await runner.test(
     'Get Protected Endpoint Without Token',
@@ -238,7 +309,7 @@ async function runTests() {
     401
   )
 
-  // Test 12: Invalid Email Format
+  // Test 15: Invalid Email Format
   await runner.test(
     'Register with Invalid Email',
     'POST',
@@ -251,20 +322,28 @@ async function runTests() {
     400
   )
 
-  // Test 13: Short Password
+  // Test 16: Short Password
   await runner.test(
     'Register with Short Password',
     'POST',
     '/api/auth/register',
     {
       name: 'Test',
-      email: `user${Date.now() + 2}@cmu.ac.th`,
+      email: `user${Date.now() + 999}@cmu.ac.th`,
       password: '123',
     },
     400
   )
 
-  // Print summary
+  // Print summary with created IDs
+  console.log(info('\n--- Test Data Created ---'))
+  console.log(info(`User 1 (Seller) ID: ${createdIds.user1}`))
+  console.log(info(`User 2 (Buyer) ID: ${createdIds.user2}`))
+  console.log(info(`Item 1 (by User 1) ID: ${createdIds.itemUser1}`))
+  console.log(info(`Item 2 (by User 2) ID: ${createdIds.itemUser2}`))
+  console.log(info(`Exchange Request ID: ${createdIds.exchangeRequest}`))
+  console.log(info(`Chat ID: ${createdIds.chat}`))
+
   runner.printSummary()
 
   // Exit with appropriate code

@@ -16,7 +16,7 @@ import { calculateItemCO2, calculateExchangeCO2Reduction } from '../utils/co2Cal
 export default function ExchangeRequestDetailPage() {
   const { requestId } = useParams()
   const navigate = useNavigate()
-  const { token, user } = useAuth()
+  const { token } = useAuth()
   const [exchangeRequest, setExchangeRequest] = useState(null)
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
