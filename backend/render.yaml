@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: cmu-sharecycle-backend
+    env: node
+    buildCommand: npm install
+    startCommand: node src/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        generateValue: true
+      - key: CLIENT_ORIGINS
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cmu-sharecycle-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+
