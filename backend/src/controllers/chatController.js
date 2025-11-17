@@ -662,7 +662,7 @@ async function fetchChatsForUser(userId) {
       participant.avatar_url AS participant_avatar_url,
       item.id AS item_resolved_id,
       item.title AS item_title,
-      item.pickup_location AS item_pickup_location,
+      item.pickup_location AS item_pickup_location,      
       item.image_url AS item_image_url,
       item.user_id AS item_owner_id,
       er.requester_id AS exchange_request_requester_id,
