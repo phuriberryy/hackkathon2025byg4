@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function LoginPage() {
@@ -10,8 +10,19 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
   const navigate = useNavigate()
+  const location = useLocation()
   const { login, token, loading } = useAuth()
+
+  // Check for success message from registration redirect
+  useEffect(() => {
+    if (location.state?.message) {
+      setSuccessMessage(location.state.message)
+      // Clear the state to prevent showing message on refresh
+      window.history.replaceState({}, document.title)
+    }
+  }, [location])
 
   // If logged in, redirect to home page
   useEffect(() => {
@@ -115,6 +126,11 @@ export default function LoginPage() {
               {submitting ? 'Logging in...' : 'Log In'}
             </button>
           </form>
+          {successMessage && (
+            <p className="mt-4 text-center text-sm text-green-600 font-medium">
+              {successMessage}
+            </p>
+          )}
           {error && <p className="mt-4 text-center text-sm text-red-500">{error}</p>}
 
           {/* Separator */}

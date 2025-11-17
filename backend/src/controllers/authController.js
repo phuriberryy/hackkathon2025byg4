@@ -32,7 +32,6 @@ export const register = async (req, res) => {
   )
 
   const user = result.rows[0]
-  const token = signToken({ id: user.id, email: user.email, name: user.name })
 
   // await sendEmail({
   //   to: user.email,
@@ -40,7 +39,16 @@ export const register = async (req, res) => {
   //   html: `<p>สวัสดี ${user.name},</p><p>บัญชีของคุณพร้อมใช้งานแล้ว เริ่มแลกเปลี่ยนเพื่อช่วยลดขยะกันเลย!</p>`,
   // })
 
-  return res.status(201).json({ user, token })
+  return res.status(201).json({ 
+    message: 'Registration successful. Please log in to continue.',
+    user: {
+      id: user.id,
+      name: user.name,
+      faculty: user.faculty,
+      email: user.email,
+      created_at: user.created_at,
+    }
+  })
 }
 
 export const login = async (req, res) => {

@@ -48,8 +48,10 @@ export const AuthProvider = ({ children }) => {
   }
 
   const register = async (payload) => {
-    const { user: newUser, token: authToken } = await authApi.register(payload)
-    persist(newUser, authToken)
+    const response = await authApi.register(payload)
+    // Registration successful but no token - user must log in separately
+    // Don't persist anything, just return success message
+    return response
   }
 
   const logout = () => persist(null, null)

@@ -29,7 +29,11 @@ export default function RegisterPage() {
     setError('')
     try {
       await register({ ...form })
-      navigate('/')
+      // Redirect to login page after successful registration
+      navigate('/login', { 
+        replace: true,
+        state: { message: 'Registration successful! Please log in to continue.' }
+      })
     } catch (err) {
       setError(err.message || 'Failed to sign up')
     } finally {
