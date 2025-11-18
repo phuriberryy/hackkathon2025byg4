@@ -14,7 +14,10 @@
     "email:gmail": "node scripts/setup-gmail.js",
     "email:update": "node scripts/update-email-password.js",
     "email:fix": "node scripts/fix-email-config.js",
-    "test:email": "node scripts/test-email.js"
+    "test:email": "node scripts/test-email.js",
+    "test:unit": "node --test",
+    "test:api": "node scripts/run-tests.js",
+    "test:all": "npm run test:unit && npm run test:api"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
