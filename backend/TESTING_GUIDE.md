@@ -1,18 +1,20 @@
-# ShareCycle Backend - Testing Guide
+# ShareCycle Backend - TESTING_GUIDE.md
 
 ## Overview
+This guide provides step-by-step instructions for testing the ShareCycle backend API.  
+It covers manual testing, automated tests, error handling, and best practices.
 
-This document provides comprehensive guidance on testing the ShareCycle backend API. The test suite covers authentication, item management, exchange requests, chat functionality, and error handling.
+---
 
-## Quick Start
+## 1. Quick Start
 
-### 1. Ensure Backend is Running
+### 1.1 Ensure Backend is Running
 ```powershell
 npm run start
 ```
-Backend should be listening on `http://localhost:4000`
+Backend should be accessible at `http://localhost:4000`
 
-### 2. Test Database Connection
+### 1.2 Test Database Connection
 ```powershell
 npm run db:test
 ```
@@ -21,7 +23,7 @@ or
 node scripts/test-db-connection.js
 ```
 
-### 3. Test Email Configuration
+### 1.3 Test Email Configuration
 ```powershell
 npm run test:email
 ```
@@ -30,35 +32,21 @@ or
 node scripts/test-email.js
 ```
 
-## Testing Methods
+---
 
-### Method 1: Using Postman (Recommended for Manual Testing)
+## 2. Testing Methods
 
-1. **Import Collection**
-   - Open Postman
-   - Click `Import` → `Upload Files`
-   - Select `ShareCycle_Complete_API.postman_collection.json`
+### 2.1 Postman (Manual Testing)
+1. Import collection: `ShareCycle_Complete_API.postman_collection.json`
+2. Set environment variables: `base_url`, `jwt_token`, `item_id`, `user_id`, etc.
+3. Execute requests in order: authentication → items → exchange → chats → error handling
+4. Copy JWT token after login and set in Authorization header
 
-2. **Set Environment Variables**
-   - After import, click on collection → `Variables`
-   - Update variables:
-     - `base_url`: http://localhost:4000
-     - `jwt_token`: (will be filled after login)
-     - `item_id`, `user_id`, etc.: (fill as you create resources)
-
-3. **Run Requests**
-   - Start with authentication requests (Register/Login)
-   - Copy JWT token from response
-   - Paste into `jwt_token` variable
-   - Use in Authorization headers for protected routes
-
-### Method 2: Using cURL (Command Line)
+### 2.2 cURL (Command Line)
 
 **Register User:**
 ```powershell
-curl -X POST http://localhost:4000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
+curl -X POST http://localhost:4000/api/auth/register   -H "Content-Type: application/json"   -d '{
     "name": "John Doe",
     "email": "john.doe@cmu.ac.th",
     "password": "password123",
@@ -66,143 +54,86 @@ curl -X POST http://localhost:4000/api/auth/register \
   }'
 ```
 
-**Login:**
+**Login User:**
 ```powershell
-curl -X POST http://localhost:4000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
+curl -X POST http://localhost:4000/api/auth/login   -H "Content-Type: application/json"   -d '{
     "email": "john.doe@cmu.ac.th",
     "password": "password123"
   }'
 ```
 
-**Get Items (with Token):**
+**Get Items (Authenticated):**
 ```powershell
-curl -X GET http://localhost:4000/api/items \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+curl -X GET http://localhost:4000/api/items   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
-### Method 3: Using Automated Test Runner
-
+### 2.3 Automated Test Runner
 ```powershell
-# Install dependencies (if not already done)
+# Install dependencies
 npm install
 
-# Run automated test suite (unit + api)
+# Run full test suite
 node scripts/run-tests.js
 ```
 
-This will:
-- Create test users
-- Test registration and login
-- Create items
-- Test item operations
-- Create exchange requests
-- Test exchange flow
-- Create chats
-- Test error handling
-- Generate test report
+- Automatically tests registration, login, item CRUD, exchange requests, chats, and error handling.
+- Produces pass/fail summary in console.
 
-## Test Case Categories
+---
 
-### 1. Authentication Tests (TC-AUTH-001 to TC-AUTH-011)
+## 3. Test Case Categories
 
-**Key Flows:**
-- Register with valid data
-- Register with invalid email/password
-- Detect duplicate emails
-- Login with correct credentials
-- Login with wrong password
-- Forgot password workflow
-- Reset password with token
+### 3.1 Authentication
+- Valid registration/login
+- Invalid email/password
+- Duplicate emails
+- Forgot/reset password flows
 
-**Running:**
-```powershell
-# Manual: Use Postman collection → Authentication folder
-# Automated: node scripts/run-tests.js
-```
-
-### 2. Item Management Tests (TC-ITEM-001 to TC-ITEM-014)
-
-**Key Flows:**
+### 3.2 Item Management
 - Get all items (public)
-- Get item details
-- Create item (authenticated)
-- Update item (owner only)
-- Delete item (owner only)
-- Get user's items
-- List exchange requests on item
+- Get item by ID
+- Create, update, delete (owner only)
+- List user’s items and related exchange requests
 
-**Important Notes:**
-- Public endpoints don't require authentication
-- Creation/update/delete require valid JWT token
-- Must be item owner to modify/delete
-
-### 3. Exchange Request Tests (TC-EXCHANGE-001 to TC-EXCHANGE-010)
-
-**Key Flows:**
-- Create exchange request on item
-- Cannot exchange own item
-- Owner accepts/rejects requests
-- Requester accepts final exchange
+### 3.3 Exchange Requests
+- Create request (cannot exchange own item)
+- Accept/reject request (owner)
+- Accept final exchange (requester)
 - Status transitions: pending → accepted-by-owner → accepted → completed
 
-### 4. Chat & Real-Time Tests (TC-CHAT-001 to TC-CHAT-009)
+### 3.4 Chat & Real-Time
+- Create chat, get chat list
+- Fetch messages, accept/decline invitations
+- Real-time message updates (WebSocket)
+- Typing indicators, online status
 
-**Key Features:**
-- Create chat with participant (by ID or email)
-- Get all chats for user
-- Get messages in chat
-- Accept/decline chat invitation
-- Confirm exchange with QR code
-- Real-time message updates via WebSocket
+### 3.5 Error Handling
+- Invalid/expired JWT token
+- Unauthorized access
+- Database connection issues
+- Input validation failures
 
-**Note:** Some features require WebSocket connection:
-- Real-time messages
-- Typing indicators
-- Online status
+---
 
-### 5. Error Handling Tests (TC-ERROR-001 to TC-ERROR-005)
+## 4. Database State Management
 
-**Coverage:**
-- Invalid JWT tokens
-- Expired tokens
-- Missing authorization
-- Database connection errors
-- Invalid input validation
-
-## Database State Management
-
-### Reset Database
-
-To start with a fresh database:
-
+### 4.1 Reset Database
 ```powershell
-# 1. Stop the server
-# Ctrl+C
-
-# 2. Run migrations (creates schema)
 npm run db:migrate
-
-# 3. Restart server
 npm run start
 ```
 
-### Seed Test Data
-
-Create test data quickly:
+### 4.2 Seed Test Data
 ```powershell
 node scripts/setup-db.js
 ```
+- Creates test users, items, exchange requests
 
-This creates:
-- Test users
-- Sample items
-- Sample exchange requests
+---
 
-## Test Data Reference
+## 5. Sample Test Data
 
-### Sample User Data
+**User:**
 ```json
 {
   "name": "John Doe",
@@ -212,7 +143,7 @@ This creates:
 }
 ```
 
-### Sample Item Data
+**Item:**
 ```json
 {
   "title": "Mountain Bike",
@@ -226,7 +157,7 @@ This creates:
 }
 ```
 
-### Sample Exchange Request Data
+**Exchange Request:**
 ```json
 {
   "itemId": "550e8400-e29b-41d4-a716-446655440000",
@@ -237,75 +168,55 @@ This creates:
 }
 ```
 
-## Response Status Codes
+---
+
+## 6. HTTP Response Status Codes
 
 | Code | Meaning |
 |------|---------|
-| 200 | Success (GET, PUT) |
+| 200 | Success (GET/PUT) |
 | 201 | Created (POST) |
-| 400 | Bad Request (validation error) |
-| 401 | Unauthorized (missing/invalid token) |
-| 403 | Forbidden (not authorized for resource) |
+| 400 | Bad Request |
+| 401 | Unauthorized |
+| 403 | Forbidden |
 | 404 | Not Found |
-| 409 | Conflict (duplicate email, etc.) |
+| 409 | Conflict |
 | 500 | Server Error |
 
-## Common Issues & Solutions
+---
 
-### Issue: "Unauthorized" on protected routes
-**Solution:** 
-- Verify JWT token is valid and not expired
-- Include token in Authorization header: `Bearer {token}`
-- Re-login to get new token
+## 7. Common Issues & Solutions
 
-### Issue: "Database connection failed"
-**Solution:**
-```powershell
-# Check database is running
-npm run test:db
+**Unauthorized Error:**
+- Check JWT token in Authorization header
+- Ensure token is valid/not expired
 
-# Verify DATABASE_URL in .env
-Get-Content .env | Select-String -Pattern "DATABASE_URL"
+**Database Connection Failed:**
+- Check database is running
+- Verify `DATABASE_URL` in `.env`
 
-# If remote DB, check network connectivity
-```
+**Email Sending Failed:**
+- Check SMTP credentials
+- Use Gmail App Password if needed
 
-### Issue: Email tests fail with "Invalid login"
-**Solution:**
-```powershell
-# Verify SMTP settings
-npm run test:email
+**CORS Errors:**
+- Verify `CLIENT_ORIGIN` in `.env`
+- Restart server
 
-# Update .env with correct credentials
-# For Gmail: use App Password (not regular password)
-# For Office365: verify credentials and 2FA
-```
+---
 
-### Issue: CORS errors on frontend
-**Solution:**
-- Verify `CLIENT_ORIGIN` in `.env` matches frontend URL
-- Example: `CLIENT_ORIGIN=http://localhost:3000`
-- Restart server after changing
+## 8. Performance & Load Testing
 
-## Performance Testing
-
-### Load Testing with Artillery
-
-1. Install Artillery:
+**Artillery Load Test:**
 ```powershell
 npm install -g artillery
-```
-
-2. Create test scenario:
-```powershell
 artillery quick --count 100 --num 50 http://localhost:4000/api/items
 ```
 
-This sends 50 requests from 100 concurrent users.
+---
 
-## Continuous Integration Testing
+## 9. CI Integration (GitHub Actions)
 
-### GitHub Actions Example
 ```yaml
 name: Backend Tests
 on: [push, pull_request]
@@ -316,25 +227,23 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2
       - run: npm install
-      - run: npm run test:unit
-      - run: npm run test:api
+      - run: node scripts/run-tests.js
 ```
 
-## Next Steps
+---
 
-1. **Start Backend**: `npm run start`
-2. **Import Postman Collection**: Get from `ShareCycle_Complete_API.postman_collection.json`
-3. **Register Test User**: Use `/api/auth/register`
-4. **Login**: Use `/api/auth/login` and copy token
-5. **Run API Requests**: Start with GET endpoints, then POST/PUT
-6. **Run Full Test Suite**: `node scripts/run-tests.js`
-7. **Review Results**: Check console output for pass/fail summary
+## 10. Next Steps
+1. Start backend: `npm run start`
+2. Import Postman collection
+3. Register test users
+4. Login and retrieve JWT tokens
+5. Test endpoints manually or via automated suite
+6. Review console results for pass/fail summary
 
-## Support
+---
 
-For issues or questions about testing:
-1. Check this guide
-2. Review `test_cases.md` for detailed scenarios
-3. Check server logs: `npm run start`
-4. Verify `.env` configuration
-5. Test database: `npm run db:test`
+## 11. Support
+- Check this guide first
+- Review `TEST_CASES.md` for detailed scenarios
+- Inspect server logs: `npm run start`
+- Verify `.env` configuration
