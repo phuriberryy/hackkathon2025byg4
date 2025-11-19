@@ -205,7 +205,7 @@ export default function ChatModal({ open, onClose, initialChatId }) {
     if (!token || !activeChatId) return
     const trimmed = (code || '').trim()
     if (!trimmed) {
-      setQrError('Please enter the exchange code')
+      setQrError(`Please enter the ${activeChat?.isDonationChat ? 'donation' : 'exchange'} code`)
       return
     }
     setQrError('')
@@ -415,6 +415,7 @@ export default function ChatModal({ open, onClose, initialChatId }) {
 
   const chatStatus = activeChat?.status
   const isExchangeChat = activeChat?.isExchangeChat
+  const isDonationChat = activeChat?.isDonationChat
   const isOwner = activeChat?.role === 'owner'
   const isRequester = activeChat?.role === 'requester'
   const hasAccepted =
@@ -425,14 +426,14 @@ export default function ChatModal({ open, onClose, initialChatId }) {
   // --- START: โค้ดที่แก้ไข ---
   const qrCodeExists = Boolean(activeChat?.qrCode) // 1. สร้างตัวแปรใหม่เช็คว่า QR มีหรือยัง
 
-  // 2. แสดงปุ่ม "ยอมรับ/ปฏิเสธ" ถ้าแชทไม่ถูกปฏิเสธ และ QR Code "ยังไม่ถูกสร้าง"
-  const showChatActions = isExchangeChat && !chatDeclined && !qrCodeExists
+  // 2. แสดงปุ่ม "ยอมรับ/ปฏิเสธ" ถ้าแชทไม่ถูกปฏิเสธ และ QR Code "ยังไม่ถูกสร้าง" (รองรับทั้ง exchange และ donation)
+  const showChatActions = (isExchangeChat || isDonationChat) && !chatDeclined && !qrCodeExists
 
-  // 3. แสดงส่วน QR ของ Owner ถ้าแชท active, เป็น owner, และ QR Code "ถูกสร้างแล้ว"
-  const showQrOwner = isExchangeChat && chatStatus === 'active' && isOwner && qrCodeExists
+  // 3. แสดงส่วน QR ของ Owner ถ้าแชท active, เป็น owner, และ QR Code "ถูกสร้างแล้ว" (รองรับทั้ง exchange และ donation)
+  const showQrOwner = (isExchangeChat || isDonationChat) && chatStatus === 'active' && isOwner && qrCodeExists
 
-  // 4. แสดงส่วน QR ของ Requester (Logic เดียวกัน)
-  const showQrRequester = isExchangeChat && chatStatus === 'active' && isRequester && qrCodeExists
+  // 4. แสดงส่วน QR ของ Requester (Logic เดียวกัน) (รองรับทั้ง exchange และ donation)
+  const showQrRequester = (isExchangeChat || isDonationChat) && chatStatus === 'active' && isRequester && qrCodeExists
   // --- END: โค้ดที่แก้ไข ---
   
   // หลังจากยืนยัน QR แล้วไม่สามารถส่งข้อความได้อีก
@@ -485,7 +486,7 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                       >
                         <p className="font-semibold text-gray-800">{chat.participant_name || 'CMU Student'}</p>
                         <p className="text-xs text-gray-500">{chat.participant_email || ''}</p>
-                        {chat.isExchangeChat && (
+                        {(chat.isExchangeChat || chat.isDonationChat) && (
                           <p className="mt-1 text-[11px] font-semibold text-primary">
                             {getChatStatusLabel(chat)}
                           </p>
@@ -532,7 +533,7 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                   </div>
                 )}
 
-                {isExchangeChat && (
+                {(isExchangeChat || isDonationChat) && (
                   <div className="mb-3 space-y-3">
                     {chatDeclined && (
                       <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 shadow-inner">
@@ -545,10 +546,10 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                         <p className="font-semibold text-yellow-900">Confirm to open chat</p>
                         <p className="mt-1 text-xs text-yellow-700">
                           {hasAccepted && otherAccepted
-                            ? 'Please accept to create QR Code for exchange confirmation'
+                            ? `Please accept to create QR Code for ${isDonationChat ? 'donation' : 'exchange'} confirmation`
                             : hasAccepted
                             ? 'You have confirmed. Waiting for the other party to respond'
-                            : 'Please accept to open conversation and create QR Code for exchange confirmation'}
+                            : `Please accept to open conversation and create QR Code for ${isDonationChat ? 'donation' : 'exchange'} confirmation`}
                         </p>
                         {(!hasAccepted || (hasAccepted && otherAccepted)) && (
                           <div className="mt-3 flex flex-wrap gap-2">
@@ -597,12 +598,12 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                       <>
                         {qrConfirmed ? (
                           // -------------------------------
-                          // 1. ถ้า QR ยืนยันแล้ว: แสดง "แลกเปลี่ยนสำเร็จ"
+                          // 1. ถ้า QR ยืนยันแล้ว: แสดง "แลกเปลี่ยน/บริจาคสำเร็จ"
                           // -------------------------------
                           <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm text-green-700 shadow-inner">
-                            <p className="font-semibold text-green-900">✅ Exchange completed!</p>
+                            <p className="font-semibold text-green-900">✅ {isDonationChat ? 'Donation' : 'Exchange'} completed!</p>
                             <p className="mt-1 text-xs text-green-600">
-                              The exchange has been completed. Thank you for using CMU ShareCycle
+                              The {isDonationChat ? 'donation' : 'exchange'} has been completed. Thank you for using CMU ShareCycle
                             </p>
                           </div>
                         ) : (
@@ -632,7 +633,7 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                                       <div className="text-left">
                                         <p className="text-base font-semibold text-primary">Show QR Code</p>
                                         <p className="text-xs text-gray-500">
-                                          Show QR Code or code to the other party to confirm the exchange
+                                          Show QR Code or code to the other party to confirm the {isDonationChat ? 'donation' : 'exchange'}
                                         </p>
                                       </div>
                                     </div>
@@ -642,12 +643,12 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                                           <QRCodeCanvas value={activeChat.qrCode} size={200} includeMargin />
                                         </div>
                                         <div className="mx-auto mt-6 w-full rounded-[18px] bg-white px-4 py-3 shadow-inner">
-                                          <p className="text-xs font-semibold text-gray-500">Exchange Code</p>
+                                          <p className="text-xs font-semibold text-gray-500">{isDonationChat ? 'Donation' : 'Exchange'} Code</p>
                                           <p className="mt-1 text-2xl font-bold tracking-widest text-primary">
                                             {activeChat.qrCode}
                                           </p>
                                           <p className="mt-2 text-xs text-gray-500">
-                                            Send this code or have your friend scan the QR Code to confirm the exchange
+                                            Send this code or have your friend scan the QR Code to confirm the {isDonationChat ? 'donation' : 'exchange'}
                                           </p>
                                         </div>
                                       </>
@@ -659,7 +660,7 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                                       <ol className="mt-2 list-decimal space-y-1 pl-5">
                                         <li>Show QR Code for the other party to scan</li>
                                         <li>Or tell them the code above to enter</li>
-                                        <li>When the other party confirms, the exchange will be completed</li>
+                                        <li>When the other party confirms, the {isDonationChat ? 'donation' : 'exchange'} will be completed</li>
                                       </ol>
                                     </div>
                                     {/* (เราลบ "✅ อีกฝ่ายยืนยัน..." ออกจากตรงนี้) */}
@@ -682,7 +683,7 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                                       <div>
                                         <p className="text-base font-semibold text-primary">Scan QR Code</p>
                                         <p className="text-xs text-gray-500">
-                                          Scan or enter the code from the poster to confirm the exchange
+                                          Scan or enter the code from the poster to confirm the {isDonationChat ? 'donation' : 'exchange'}
                                         </p>
                                       </div>
                                       <div className="flex gap-2 rounded-full bg-white p-1 text-xs font-semibold text-primary shadow-inner">
@@ -739,13 +740,13 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                                     ) : (
                                       <div className="mt-4 space-y-3 rounded-[24px] bg-white px-4 py-4 shadow-inner">
                                         <p className="text-xs font-semibold text-gray-600">
-                                          Enter the code you received (format: EX12345678)
+                                          Enter the code you received (format: {isDonationChat ? 'DN' : 'EX'}12345678)
                                         </p>
                                         <input
                                           type="text"
                                           value={qrCodeInput}
                                           onChange={(e) => setQrCodeInput(e.target.value.toUpperCase())}
-                                          placeholder="EXXXXXXXXX"
+                                          placeholder={isDonationChat ? "DNXXXXXXXX" : "EXXXXXXXXX"}
                                           className="w-full rounded-xl border border-gray-200 px-3 py-2 text-center text-sm uppercase tracking-[0.2em]"
                                         />
                                         <button
@@ -786,8 +787,8 @@ export default function ChatModal({ open, onClose, initialChatId }) {
                                   <span>
                                     {/* (โค้ดนี้ยังทำงานเหมือนเดิม แต่จะถูกซ่อนเมื่อ qrConfirmed=true) */}
                                     {qrConfirmed
-                                      ? 'Exchange confirmed'
-                                      : 'Ready to confirm exchange'}
+                                      ? `${isDonationChat ? 'Donation' : 'Exchange'} confirmed`
+                                      : `Ready to confirm ${isDonationChat ? 'donation' : 'exchange'}`}
                                   </span>
                                 </div>
                                 <button

@@ -2,7 +2,43 @@
 
 // List of inappropriate words (basic example - in production, use a comprehensive list or API)
 const INAPPROPRIATE_WORDS = [
-  'spam', 'scam', 'fake', 'test123', 'asdf', 'qwerty'
+  // Spam/Test words
+  'spam', 'scam', 'fake', 'test123', 'asdf', 'qwerty',
+  
+  // Profanity - English
+  'fuck', 'fucking', 'fucked', 'shit', 'shitting', 'damn', 'damned',
+  'bitch', 'bitches', 'ass', 'asshole', 'bastard', 'crap', 'cunt',
+  'dick', 'dicks', 'pussy', 'cock', 'whore', 'slut', 'nigger', 'nigga',
+  'retard', 'retarded', 'gay', 'fag', 'faggot', 'homo', 'lesbo',
+  
+  // Profanity - Thai (transliterated)
+  'ai', 'ee', 'khee', 'khi', 'kwai', 'kwaii', 'sii', 'see',
+  'mae', 'mee', 'mhee', 'pii', 'pee', 'peepee', 'piss',
+  
+  // Sexual content
+  'sex', 'sexual', 'porn', 'porno', 'pornography', 'xxx', 'nude', 'naked',
+  'orgasm', 'masturbate', 'masturbation', 'penis', 'vagina', 'boob', 'boobs',
+  'breast', 'breasts', 'nipple', 'nipples', 'erotic', 'erotica',
+  
+  // Violence/Threats
+  'kill', 'killing', 'murder', 'murderer', 'suicide', 'bomb', 'terrorist',
+  'terrorism', 'violence', 'violent', 'weapon', 'gun', 'knife', 'shoot',
+  'shooting', 'rape', 'raping', 'abuse', 'abusing',
+  
+  // Drugs/Illegal substances
+  'drug', 'drugs', 'cocaine', 'heroin', 'marijuana', 'weed', 'cannabis',
+  'meth', 'methamphetamine', 'lsd', 'ecstasy', 'mdma', 'opium',
+  
+  // Hate speech
+  'hate', 'hatred', 'racist', 'racism', 'nazi', 'hitler', 'holocaust',
+  'genocide', 'ethnic', 'cleansing',
+  
+  // Scam/Fraud related
+  'phishing', 'phish', 'fraud', 'fraudulent', 'steal', 'stealing', 'theft',
+  'hack', 'hacking', 'hacker', 'virus', 'malware', 'trojan',
+  
+  // Other inappropriate
+  'stupid', 'idiot', 'moron', 'dumb', 'dumbass', 'loser', 'pathetic'
 ]
 
 // Check for spam patterns
@@ -17,9 +53,17 @@ export const detectSpam = (text) => {
   
   const lowerText = trimmedText.toLowerCase()
   
-  // Check for inappropriate words (only English words for now)
+  // Check for inappropriate words
+  // Use word boundary regex to match whole words only (avoid false positives)
   for (const word of INAPPROPRIATE_WORDS) {
-    if (lowerText.includes(word)) {
+    // Create regex pattern that matches the word as a whole word
+    // \b is word boundary, but we also check for spaces, punctuation, or start/end
+    const wordPattern = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i')
+    if (wordPattern.test(lowerText)) {
+      return { isSpam: true, reason: 'Contains inappropriate content' }
+    }
+    // Also check if the word appears at the start or end of the text
+    if (lowerText.startsWith(word + ' ') || lowerText.endsWith(' ' + word) || lowerText === word) {
       return { isSpam: true, reason: 'Contains inappropriate content' }
     }
   }

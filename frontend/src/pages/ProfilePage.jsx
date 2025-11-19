@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
 import {
   ArrowRightLeft,
   User,
@@ -8,9 +8,12 @@ import {
   Image as ImageIcon,
   Eye,
   Clock3,
+  Heart,
+  Trash2,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { profileApi, exchangeApi } from '../lib/api'
+import { profileApi, exchangeApi, donationApi, itemsApi, API_BASE } from '../lib/api'
+import { io } from 'socket.io-client'
 import EditItemModal from '../components/modals/EditItemModal'
 import ManageItemModal from '../components/modals/ManageItemModal'
 
@@ -20,6 +23,7 @@ export default function ProfilePage() {
   const [myItems, setMyItems] = useState([])
   const [exchangeHistory, setExchangeHistory] = useState([])
   const [exchangeRequests, setExchangeRequests] = useState([])
+  const [donationHistory, setDonationHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [showEditItemModal, setShowEditItemModal] = useState(false)
   const [showManageItemModal, setShowManageItemModal] = useState(false)
@@ -50,20 +54,91 @@ export default function ProfilePage() {
     fetchProfile()
   }, [token])
 
-  useEffect(() => {
-    const fetchMyItems = async () => {
-      if (!token || activeTab !== 'posts') return
+  const fetchMyItems = useCallback(async () => {
+    // Fetch items เมื่อ activeTab เป็น 'posts' หรือ 'expired' เพื่อให้แสดงทั้ง active และ expired items
+    if (!token || (activeTab !== 'posts' && activeTab !== 'expired')) return
 
-      try {
-        const data = await profileApi.getMyItems(token)
-        setMyItems(data)
-      } catch (err) {
-        console.error('Failed to fetch my items:', err)
-      }
+    try {
+      const data = await profileApi.getMyItems(token)
+      setMyItems(data)
+    } catch (err) {
+      console.error('Failed to fetch my items:', err)
     }
-
-    fetchMyItems()
   }, [token, activeTab])
+
+  useEffect(() => {
+    fetchMyItems()
+  }, [fetchMyItems])
+
+  // Real-time updates via socket.io
+  useEffect(() => {
+    if (!token) return
+
+    const socket = io(API_BASE.replace(/\/api$/, ''), {
+      auth: { token },
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: Infinity,
+      timeout: 20000,
+      transports: ['polling', 'websocket'],
+      upgrade: true,
+    })
+
+    socket.on('connect_error', (err) => {
+      // Silently handle connection errors - backend might not be running
+      if (err.message !== 'websocket error' && err.message !== 'xhr poll error') {
+        console.debug('Socket connection error:', err.message)
+      }
+    })
+
+    socket.on('item:updated', () => {
+      if (activeTab === 'posts' || activeTab === 'expired') {
+        fetchMyItems()
+      }
+    })
+
+    socket.on('item:deleted', () => {
+      if (activeTab === 'posts' || activeTab === 'expired') {
+        fetchMyItems()
+      }
+    })
+
+    socket.on('exchange:completed', () => {
+      if (activeTab === 'history') {
+        profileApi.getExchangeHistory(token)
+          .then(setExchangeHistory)
+          .catch((err) => console.error('Failed to refresh exchange history:', err))
+      }
+      if (activeTab === 'posts' || activeTab === 'expired') {
+        fetchMyItems()
+      }
+    })
+
+    socket.on('donation:completed', () => {
+      if (activeTab === 'donations') {
+        donationApi.getMyDonations(token)
+          .then(setDonationHistory)
+          .catch((err) => console.error('Failed to refresh donation history:', err))
+      }
+      if (activeTab === 'posts' || activeTab === 'expired') {
+        fetchMyItems()
+      }
+    })
+
+    socket.on('notification:new', () => {
+      // Refresh exchange requests count if needed
+      if (activeTab === 'posts') {
+        exchangeApi.getMyRequests(token)
+          .then(setExchangeRequests)
+          .catch((err) => console.error('Failed to refresh exchange requests:', err))
+      }
+    })
+
+    return () => {
+      socket.disconnect()
+    }
+  }, [token, activeTab, fetchMyItems])
 
   useEffect(() => {
     const fetchExchangeHistory = async () => {
@@ -78,6 +153,21 @@ export default function ProfilePage() {
     }
 
     fetchExchangeHistory()
+  }, [token, activeTab])
+
+  useEffect(() => {
+    const fetchDonationHistory = async () => {
+      if (!token || activeTab !== 'donations') return
+
+      try {
+        const data = await donationApi.getMyDonations(token)
+        setDonationHistory(data)
+      } catch (err) {
+        console.error('Failed to fetch donation history:', err)
+      }
+    }
+
+    fetchDonationHistory()
   }, [token, activeTab])
 
   useEffect(() => {
@@ -126,15 +216,35 @@ export default function ProfilePage() {
     setShowManageItemModal(true)
   }
 
+  const handleDeleteItem = async (item) => {
+    if (!token) return
+    
+    if (!window.confirm(`Are you sure you want to delete "${item.title}"? This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      await itemsApi.delete(token, item.id)
+      // Refresh items list
+      if (activeTab === 'posts' || activeTab === 'expired') {
+        const data = await profileApi.getMyItems(token)
+        setMyItems(data)
+      }
+    } catch (err) {
+      console.error('Failed to delete item:', err)
+      alert(err.message || 'Failed to delete item')
+    }
+  }
+
   const handleItemUpdate = async () => {
-    // Refresh items list
-    if (token && activeTab === 'posts') {
+    // Refresh items list เมื่อแก้ไข item เพื่อให้ expired items อัปเดต
+    if (token && (activeTab === 'posts' || activeTab === 'expired')) {
       try {
         const data = await profileApi.getMyItems(token)
         setMyItems(data)
       } catch (err) {
         console.error('Failed to refresh items:', err)
-  }
+      }
     }
   }
 
@@ -252,12 +362,23 @@ export default function ProfilePage() {
             <ArrowRightLeft size={16} />
             Exchange History
           </button>
+          <button
+            onClick={() => setActiveTab('donations')}
+              className={`flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+              activeTab === 'donations'
+                  ? 'bg-gray-200 text-gray-800'
+                  : 'bg-transparent text-gray-700'
+            }`}
+          >
+            <Heart size={16} />
+            Donations ({donationHistory.length})
+          </button>
           </div>
         </div>
       </section>
 
       <div className="mt-10">
-        {activeTab === 'posts' ? (
+        {activeTab === 'posts' && (
           <div>
             {activeItems.length === 0 ? (
               <div className="rounded-[32px] bg-white p-12 text-center shadow-soft">
@@ -333,6 +454,14 @@ export default function ProfilePage() {
                           >
                             Edit
                           </button>
+                          <button
+                            onClick={() => handleDeleteItem(item)}
+                            disabled={!canEdit}
+                            className="rounded-full bg-red-100 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={!canEdit ? 'Cannot delete because there is an accepted exchange request' : 'Delete this post'}
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -341,7 +470,8 @@ export default function ProfilePage() {
               </div>
             )}
           </div>
-        ) : activeTab === 'expired' ? (
+        )}
+        {activeTab === 'expired' && (
           <div>
             <div className="mb-6 rounded-[24px] bg-yellow-50 border border-yellow-200 p-6">
               <div className="flex items-start gap-3">
@@ -434,6 +564,14 @@ export default function ProfilePage() {
                           >
                             Edit
                           </button>
+                          <button
+                            onClick={() => handleDeleteItem(item)}
+                            disabled={!canEdit}
+                            className="rounded-full bg-red-100 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={!canEdit ? 'Cannot delete because there is an accepted exchange request' : 'Delete this post'}
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -442,7 +580,8 @@ export default function ProfilePage() {
               </div>
             )}
           </div>
-        ) : (
+        )}
+        {activeTab === 'history' && (
           <div>
             {exchangeHistory.length === 0 ? (
               <div className="rounded-[32px] bg-white p-12 text-center shadow-soft">
@@ -450,48 +589,194 @@ export default function ProfilePage() {
                 <p className="mt-2 text-sm text-gray-500">Your exchange timeline will show up here.</p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {exchangeHistory.map((history) => (
-                  <div
-                    key={history.id}
-                    className="rounded-[24px] bg-white p-6 shadow-soft transition hover:shadow-card"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle size={20} className="text-green-500" />
-                          <h3 className="text-lg font-semibold text-gray-900">{history.item_title}</h3>
-                        </div>
-                        <p className="mt-2 text-sm text-gray-600">
-                          {history.user_role === 'owner' ? (
-                            <>
-                              You exchanged with <strong>{history.requester_name}</strong>
-                            </>
-                          ) : (
-                            <>
-                              You exchanged with <strong>{history.owner_name}</strong>
-                            </>
-                          )}
+              <div className="space-y-6">
+                {exchangeHistory.map((history) => {
+                  const exchangeDate = new Date(history.exchanged_at)
+
+                  return (
+                    <div
+                      key={history.id}
+                      className="rounded-[24px] bg-white p-6 shadow-soft transition hover:shadow-card"
+                    >
+                      {/* Date and CO2 Badge */}
+                      <div className="mb-4 flex items-center justify-between">
+                        <p className="text-sm font-medium text-gray-600">
+                          {exchangeDate.toLocaleDateString('th-TH', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                          })}
                         </p>
-                        <p className="mt-1 text-sm text-gray-500">
-                          CO₂ Reduced: <strong className="text-primary">{history.co2_reduced} kg</strong>
-                        </p>
-                        <p className="mt-2 text-xs text-gray-400">
-                          {new Date(history.exchanged_at).toLocaleString('th-TH')}
-                        </p>
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-sm font-semibold text-green-700">
+                          <CheckCircle size={16} className="text-green-600" />
+                          ประหยัด CO₂ {parseFloat(history.co2_reduced || 0).toFixed(1)}kg
+                        </span>
                       </div>
-                      <div className="ml-4">
-                        {history.item_image_url && (
-                          <img
-                            src={history.item_image_url}
-                            alt={history.item_title}
-                            className="h-20 w-20 rounded-lg object-cover"
-                          />
-                        )}
+
+                      {/* Exchange Items Display */}
+                      <div className="flex items-center gap-4">
+                        {/* My Item (ของของฉัน) */}
+                        <div className="flex-1">
+                          <div className="text-center">
+                            <div className="mb-2 inline-block rounded-lg bg-gray-50 p-2">
+                              {history.my_item_image_url ? (
+                                <img
+                                  src={history.my_item_image_url}
+                                  alt={history.my_item_title || 'My item'}
+                                  className="h-32 w-32 rounded-lg object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-32 w-32 items-center justify-center rounded-lg bg-gray-200">
+                                  <Package size={32} className="text-gray-400" />
+                                </div>
+                              )}
+                            </div>
+                            <p className="mt-2 text-xs font-medium text-gray-500">ของของฉัน</p>
+                            <p className="mt-1 text-sm font-semibold text-gray-900">
+                              {history.my_item_title || history.item_title || 'Unknown Item'}
+                            </p>
+                            {history.my_item_category && (
+                              <p className="mt-1 text-xs text-gray-500">{history.my_item_category}</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Exchange Arrow */}
+                        <div className="flex flex-col items-center">
+                          <ArrowRightLeft size={24} className="text-primary" />
+                        </div>
+
+                        {/* Received Item (ที่ได้รับ) */}
+                        <div className="flex-1">
+                          <div className="text-center">
+                            <div className="mb-2 inline-block rounded-lg bg-gray-50 p-2">
+                              {history.received_item_image_url ? (
+                                <img
+                                  src={history.received_item_image_url}
+                                  alt={history.received_item_title || 'Received item'}
+                                  className="h-32 w-32 rounded-lg object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-32 w-32 items-center justify-center rounded-lg bg-gray-200">
+                                  <Package size={32} className="text-gray-400" />
+                                </div>
+                              )}
+                            </div>
+                            <p className="mt-2 text-xs font-medium text-gray-500">ที่ได้รับ</p>
+                            <p className="mt-1 text-sm font-semibold text-gray-900">
+                              {history.received_item_title || 'Unknown Item'}
+                            </p>
+                            {history.received_item_category && (
+                              <p className="mt-1 text-xs text-gray-500">{history.received_item_category}</p>
+                            )}
+                            {history.received_from_name && (
+                              <p className="mt-1 text-xs text-gray-500">
+                                จาก {history.received_from_name}
+                              </p>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+        {activeTab === 'donations' && (
+          <div>
+            {donationHistory.length === 0 ? (
+              <div className="rounded-[32px] bg-white p-12 text-center shadow-soft">
+                <Heart size={48} className="mx-auto mb-4 text-gray-400" />
+                <p className="text-lg font-semibold text-gray-700">No donations yet.</p>
+                <p className="mt-2 text-sm text-gray-500">Your donation history will show up here.</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {donationHistory.map((donation) => {
+                  const donationDate = new Date(donation.donated_at)
+
+                  return (
+                    <div
+                      key={donation.id}
+                      className="rounded-[24px] bg-white p-6 shadow-soft transition hover:shadow-card"
+                    >
+                      {/* Date and CO2 Badge */}
+                      <div className="mb-4 flex items-center justify-between">
+                        <p className="text-sm font-medium text-gray-600">
+                          {donationDate.toLocaleDateString('th-TH', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                          })}
+                        </p>
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-sm font-semibold text-red-700">
+                          <Heart size={16} className="text-red-600" />
+                          ประหยัด CO₂ {parseFloat(donation.co2_reduced || 0).toFixed(1)}kg
+                        </span>
+                      </div>
+
+                      {/* Donation Item Display */}
+                      <div className="flex items-center gap-4">
+                        <div className="flex-1">
+                          <div className="text-center">
+                            <div className="mb-2 inline-block rounded-lg bg-gray-50 p-2">
+                              {donation.item_image_url ? (
+                                <img
+                                  src={donation.item_image_url}
+                                  alt={donation.item_title || 'Donated item'}
+                                  className="h-32 w-32 rounded-lg object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-32 w-32 items-center justify-center rounded-lg bg-gray-200">
+                                  <Package size={32} className="text-gray-400" />
+                                </div>
+                              )}
+                            </div>
+                            <p className="mt-2 text-xs font-medium text-gray-500">Donated Item</p>
+                            <p className="mt-1 text-sm font-semibold text-gray-900">
+                              {donation.item_title || 'Unknown Item'}
+                            </p>
+                            {donation.item_category && (
+                              <p className="mt-1 text-xs text-gray-500">{donation.item_category}</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Donation Info */}
+                        <div className="flex-1">
+                          <div className="rounded-lg bg-red-50 p-4">
+                            {donation.recipient_name && (
+                              <div className="mb-2">
+                                <p className="text-xs font-medium text-gray-500">Recipient</p>
+                                <p className="text-sm font-semibold text-gray-900">{donation.recipient_name}</p>
+                              </div>
+                            )}
+                            {donation.recipient_contact && (
+                              <div className="mb-2">
+                                <p className="text-xs font-medium text-gray-500">ข้อมูลติดต่อ</p>
+                                <p className="text-sm text-gray-700">{donation.recipient_contact}</p>
+                              </div>
+                            )}
+                            {donation.donation_location && (
+                              <div className="mb-2">
+                                <p className="text-xs font-medium text-gray-500">Donation Location</p>
+                                <p className="text-sm text-gray-700">{donation.donation_location}</p>
+                              </div>
+                            )}
+                            {donation.message && (
+                              <div className="mt-2 border-t border-red-200 pt-2">
+                                <p className="text-xs font-medium text-gray-500">ข้อความ</p>
+                                <p className="text-sm text-gray-700">{donation.message}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Search,
@@ -20,11 +20,15 @@ import {
   TrendingUp,
   CheckCircle,
   BarChart3,
+  Heart,
 } from 'lucide-react'
-import { itemsApi, statisticsApi } from '../lib/api'
+import { itemsApi, statisticsApi, API_BASE } from '../lib/api'
+import { useAuth } from '../context/AuthContext'
+import { io } from 'socket.io-client'
 
-export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
+export default function HomePage({ onExchangeItem, onDonationItem, onPostItem, refreshKey }) {
   const navigate = useNavigate()
+  const { user, token } = useAuth()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('All Categories')
   const [selectedCondition, setSelectedCondition] = useState('All Conditions')
@@ -59,7 +63,7 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
     { title: 'Save Money', description: 'No buying needed', icon: PiggyBank },
   ]
 
-  useEffect(() => {
+  const fetchItems = useCallback(() => {
     setLoading(true)
     itemsApi
       .list()
@@ -68,7 +72,71 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
       })
       .catch(() => setItems([]))
       .finally(() => setLoading(false))
-  }, [refreshKey])
+  }, [])
+
+  useEffect(() => {
+    fetchItems()
+  }, [refreshKey, fetchItems])
+
+  // Real-time updates via socket.io
+  useEffect(() => {
+    if (!token) return
+
+    const socket = io(API_BASE.replace(/\/api$/, ''), {
+      auth: { token },
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: Infinity,
+      timeout: 20000,
+      transports: ['polling', 'websocket'],
+      upgrade: true,
+    })
+
+    socket.on('connect_error', (err) => {
+      // Silently handle connection errors - backend might not be running
+      // Only log non-transport errors to reduce console spam
+      if (err.message !== 'websocket error' && err.message !== 'xhr poll error') {
+        console.debug('Socket connection error:', err.message)
+      }
+    })
+
+    socket.on('connect', () => {
+      console.debug('Socket connected for real-time updates')
+    })
+
+    socket.on('item:created', () => {
+      fetchItems()
+    })
+
+    socket.on('item:updated', () => {
+      fetchItems()
+    })
+
+    socket.on('item:deleted', () => {
+      fetchItems()
+    })
+
+    socket.on('exchange:completed', () => {
+      fetchItems()
+      // Refresh statistics when exchange completes
+      statisticsApi.getStatistics()
+        .then(setStatistics)
+        .catch((err) => console.error('Failed to refresh statistics:', err))
+    })
+
+    socket.on('donation:completed', () => {
+      fetchItems()
+      // Refresh statistics when donation completes
+      statisticsApi.getStatistics()
+        .then(setStatistics)
+        .catch((err) => console.error('Failed to refresh statistics:', err))
+    })
+
+    return () => {
+      socket.disconnect()
+    }
+  }, [token, fetchItems])
 
   useEffect(() => {
     setLoadingStats(true)
@@ -377,6 +445,7 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {filteredItems.map((item) => {
             const isInProgress = item.status === 'in_progress'
+            const isDonated = item.status === 'donated'
             return (
             <article
               key={item.id}
@@ -401,16 +470,29 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
                     if (!item.available_until) {
                       return null
                     }
+                    // ใช้การเปรียบเทียบวันที่ (ไม่สนใจเวลา) เพื่อให้สอดคล้องกับ backend
                     const today = new Date()
+                    today.setHours(0, 0, 0, 0)
                     const expiryDate = new Date(item.available_until)
+                    expiryDate.setHours(0, 0, 0, 0)
                     const diffTime = expiryDate - today
                     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
                     
+                    // เมื่อ diffDays = 0 หมายถึง 0 days remaining (วันนี้เป็นวันสุดท้าย)
+                    // ซึ่ง backend จะถือว่า expired และไม่แสดงใน feed
                     if (diffDays < 0) {
                       return (
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1.5 text-sm font-semibold text-red-700">
                           <Clock3 size={16} />
                           Expired
+                        </span>
+                      )
+                    } else if (diffDays === 0) {
+                      // 0 days remaining - จะถูกย้ายไป expired tab
+                      return (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-yellow-100 px-3 py-1.5 text-sm font-semibold text-yellow-700">
+                          <Clock3 size={16} />
+                          0 days remaining
                         </span>
                       )
                     } else if (diffDays <= 7) {
@@ -424,10 +506,14 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
                     return null
                   })()}
                 </div>
-                {/* Right badge: Exchange or in progress */}
+                {/* Right badge: Exchange/Donation or in progress */}
                 {isInProgress ? (
                   <span className="absolute right-4 top-4 rounded-full bg-yellow-500 px-3 py-1.5 text-sm font-semibold text-white shadow-md">
                     In progress
+                  </span>
+                ) : item.listing_type === 'donation' ? (
+                  <span className="absolute right-4 top-4 rounded-full bg-red-500 px-3 py-1.5 text-sm font-semibold text-white">
+                    Donation
                   </span>
                 ) : (
                   <span className="absolute right-4 top-4 rounded-full bg-primary px-3 py-1.5 text-sm font-semibold text-white">
@@ -485,7 +571,15 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
                       <RefreshCcw size={16} className="mx-auto" />
                       <span className="mt-1 block text-xs">In progress</span>
                     </button>
-                  ) : (
+                  ) : isDonated ? (
+                    <button
+                      disabled
+                      className="flex-1 rounded-lg bg-green-300 px-4 py-2.5 text-sm font-semibold text-green-700 shadow-md cursor-not-allowed"
+                    >
+                      <Heart size={16} className="mx-auto" />
+                      <span className="mt-1 block text-xs">Donated</span>
+                    </button>
+                  ) : item.status === 'active' && item.listing_type !== 'donation' ? (
                     <button
                       onClick={() => onExchangeItem(item.id)}
                       className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-primary-dark"
@@ -493,7 +587,7 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
                       <RefreshCcw size={16} className="mx-auto" />
                       <span className="mt-1 block text-xs">Exchange</span>
                     </button>
-                  )}
+                  ) : null}
                 </div>
               </div>
             </article>
@@ -501,6 +595,7 @@ export default function HomePage({ onExchangeItem, onPostItem, refreshKey }) {
           })}
         </div>
       </section>
+
     </div>
   )
 }

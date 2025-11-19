@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Bell, Clock3, CheckCircle, XCircle, MessageCircle, RefreshCw, ArrowRight } from 'lucide-react'
+import { Bell, Clock3, CheckCircle, XCircle, MessageCircle, RefreshCw, ArrowRight, Heart } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Modal from '../ui/Modal'
 import { notificationApi } from '../../lib/api'
@@ -66,6 +66,18 @@ export default function NotificationsModal({ open, onClose, onUnreadChange }) {
     }
   }
 
+  const handleViewDonationRequest = async (notification) => {
+    const metadata = notification.metadata || {}
+    const donationRequestId = metadata.donationRequestId || metadata.donationRequest_id
+
+    if (donationRequestId) {
+      // Mark as read ก่อน navigate
+      await handleMarkAsRead(notification)
+      onClose()
+      navigate(`/donation-requests/${donationRequestId}`)
+    }
+  }
+
   const handleOpenChat = async (notification) => {
     const metadata = notification.metadata || {}
     const chatId = metadata.chatId || metadata.chat_id
@@ -107,6 +119,12 @@ export default function NotificationsModal({ open, onClose, onUnreadChange }) {
         return <XCircle size={20} className="text-red-500" />
       case 'exchange_completed':
         return <MessageCircle size={20} className="text-primary" />
+      case 'donation_request':
+        return <Heart size={20} className="text-red-500" />
+      case 'donation_accepted':
+        return <CheckCircle size={20} className="text-green-500" />
+      case 'donation_rejected':
+        return <XCircle size={20} className="text-red-500" />
       default:
         return <Bell size={20} className="text-gray-500" />
     }
@@ -130,6 +148,7 @@ export default function NotificationsModal({ open, onClose, onUnreadChange }) {
           {!loading &&
             notifications.map((notification) => {
               const isExchangeRequest = notification.type === 'exchange_request' || notification.type === 'exchange_accepted'
+              const isDonationRequest = notification.type === 'donation_request' || notification.type === 'donation_accepted'
               const isCompleted = notification.type === 'exchange_completed'
               // Check for message notifications (support both Thai and English titles)
               const isMessage = notification.title === 'New message' || 
@@ -148,10 +167,12 @@ export default function NotificationsModal({ open, onClose, onUnreadChange }) {
                   onClick={async () => {
                     if (isExchangeRequest || isCompleted) {
                       await handleViewExchangeRequest(notification)
+                    } else if (isDonationRequest) {
+                      await handleViewDonationRequest(notification)
                     } else if (isMessage && chatId) {
                       await handleOpenChat(notification)
                     } else {
-                      // ถ้าไม่ใช่ exchange request หรือ message ก็ mark as read เมื่อคลิก
+                      // ถ้าไม่ใช่ exchange/donation request หรือ message ก็ mark as read เมื่อคลิก
                       await handleMarkAsRead(notification)
                     }
                   }}
@@ -181,6 +202,12 @@ export default function NotificationsModal({ open, onClose, onUnreadChange }) {
                       </div>
                       {(isExchangeRequest || isCompleted) && (
                         <div className="mt-3 flex items-center gap-2 text-sm text-primary">
+                          <span>View Details</span>
+                          <ArrowRight size={16} />
+                        </div>
+                      )}
+                      {isDonationRequest && (
+                        <div className="mt-3 flex items-center gap-2 text-sm text-red-500">
                           <span>View Details</span>
                           <ArrowRight size={16} />
                         </div>

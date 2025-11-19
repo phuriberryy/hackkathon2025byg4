@@ -10,6 +10,8 @@ import chatRoutes from './routes/chat.routes.js'
 import profileRoutes from './routes/profile.routes.js'
 import emailRoutes from './routes/email.routes.js'
 import statisticsRoutes from './routes/statistics.routes.js'
+import donationRoutes from './routes/donation.routes.js'
+import donationRequestRoutes from './routes/donationRequest.routes.js'
 
 const app = express()
 
@@ -40,6 +42,8 @@ app.use('/api/chats', chatRoutes)
 app.use('/api/profile', profileRoutes)
 app.use('/api/email', emailRoutes)
 app.use('/api/statistics', statisticsRoutes)
+app.use('/api/donations', donationRoutes)
+app.use('/api/donation-requests', donationRequestRoutes)
 
 app.use((err, _req, res, _next) => {
   console.error(err)

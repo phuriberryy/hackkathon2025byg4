@@ -2,6 +2,7 @@ import { validationResult } from 'express-validator'
 import { query } from '../db/pool.js'
 import { calculateItemCO2 } from '../utils/co2Calculator.js'
 import { detectSpam, validateImage, checkDuplicateContent } from '../utils/contentModeration.js'
+import { getChatServer } from '../services/chatService.js'
 
 // ดึง items ทั้งหมด (public)
 export const getItems = async (_req, res) => {
@@ -11,7 +12,8 @@ export const getItems = async (_req, res) => {
        FROM items
        JOIN users ON items.user_id = users.id
        WHERE (status='active' OR status='in_progress')
-         AND (available_until IS NULL OR available_until >= CURRENT_DATE)
+         AND status != 'donated'
+         AND (available_until IS NULL OR available_until > CURRENT_DATE)
        ORDER BY created_at DESC`
     )
 
@@ -68,7 +70,7 @@ export const createItem = async (req, res) => {
     return res.status(400).json({ errors: errors.array() })
   }
 
-  const { title, category, itemCondition, lookingFor, description, availableUntil, imageUrl, pickupLocation } =
+  const { title, category, itemCondition, lookingFor, description, availableUntil, imageUrl, pickupLocation, listingType } =
     req.body
 
   try {
@@ -120,9 +122,26 @@ export const createItem = async (req, res) => {
       })
     }
 
+    // Validate expiration date - cannot be in the past
+    if (availableUntil) {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const expiryDate = new Date(availableUntil)
+      expiryDate.setHours(0, 0, 0, 0)
+      
+      if (expiryDate < today) {
+        return res.status(400).json({ 
+          message: 'Expiration date cannot be in the past' 
+        })
+      }
+    }
+
+    // Validate listingType
+    const validListingType = listingType === 'donation' ? 'donation' : 'exchange'
+    
     const result = await query(
-      `INSERT INTO items (user_id, title, category, item_condition, looking_for, description, available_until, image_url, pickup_location)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      `INSERT INTO items (user_id, title, category, item_condition, looking_for, description, available_until, image_url, pickup_location, listing_type)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        RETURNING *`,
       [
         req.user.id,
@@ -134,6 +153,7 @@ export const createItem = async (req, res) => {
         availableUntil || null,
         imageUrl || null,
         pickupLocation || null,
+        validListingType,
       ]
     )
 
@@ -141,6 +161,12 @@ export const createItem = async (req, res) => {
     
     // คำนวณ CO₂ footprint
     item.co2_footprint = calculateItemCO2(item.category, item.item_condition)
+
+    // Emit socket event for real-time update
+    const io = getChatServer()
+    if (io) {
+      io.emit('item:created')
+    }
 
     return res.status(201).json(item)
   } catch (err) {
@@ -161,7 +187,7 @@ export const updateItem = async (req, res) => {
     return res.status(400).json({ errors: errors.array() })
   }
 
-  const { title, category, itemCondition, lookingFor, description, availableUntil, imageUrl, pickupLocation, status } =
+  const { title, category, itemCondition, lookingFor, description, availableUntil, imageUrl, pickupLocation, status, listingType } =
     req.body
 
   try {
@@ -217,6 +243,23 @@ export const updateItem = async (req, res) => {
       return res.status(403).json({ message: 'You can only update your own items' })
     }
 
+    // Validate expiration date - cannot be in the past
+    if (availableUntil) {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const expiryDate = new Date(availableUntil)
+      expiryDate.setHours(0, 0, 0, 0)
+      
+      if (expiryDate < today) {
+        return res.status(400).json({ 
+          message: 'Expiration date cannot be in the past' 
+        })
+      }
+    }
+
+    // Validate listingType if provided
+    const validListingType = listingType === 'donation' ? 'donation' : (listingType === 'exchange' ? 'exchange' : null)
+    
     const result = await query(
       `UPDATE items 
        SET title=COALESCE($1, title),
@@ -228,16 +271,23 @@ export const updateItem = async (req, res) => {
            image_url=COALESCE($7, image_url),
            pickup_location=COALESCE($8, pickup_location),
            status=COALESCE($9, status),
+           listing_type=COALESCE($10, listing_type),
            updated_at=NOW()
-       WHERE id=$10
+       WHERE id=$11
        RETURNING *`,
-      [title, category, itemCondition, lookingFor, description, availableUntil, imageUrl, pickupLocation, status, itemId]
+      [title, category, itemCondition, lookingFor, description, availableUntil, imageUrl, pickupLocation, status, validListingType, itemId]
     )
 
     const item = result.rows[0]
     
     // คำนวณ CO₂ footprint
     item.co2_footprint = calculateItemCO2(item.category, item.item_condition)
+
+    // Emit socket event for real-time update
+    const io = getChatServer()
+    if (io) {
+      io.emit('item:updated', { itemId: item.id })
+    }
 
     return res.json(item)
   } catch (err) {
@@ -267,6 +317,12 @@ export const deleteItem = async (req, res) => {
 
     // ลบ item (CASCADE จะลบ exchange_requests ที่เกี่ยวข้องด้วย)
     await query('DELETE FROM items WHERE id=$1', [itemId])
+
+    // Emit socket event for real-time update
+    const io = getChatServer()
+    if (io) {
+      io.emit('item:deleted', { itemId })
+    }
 
     return res.json({ success: true, message: 'Item deleted successfully' })
   } catch (err) {

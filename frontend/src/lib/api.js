@@ -1,4 +1,4 @@
-export const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000/api'
+export const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:4000/api'
 
 const handleResponse = async (res) => {
   if (res.status === 204) return null
@@ -139,6 +139,7 @@ export const profileApi = {
     }),
   getMyItems: (token) => request('/profile/items', { token }),
   getExchangeHistory: (token) => request('/profile/exchange-history', { token }),
+  getDonationHistory: (token) => request('/donations/my-donations', { token }),
 }
 
 export const chatApi = {
@@ -160,4 +161,53 @@ export const chatApi = {
 
 export const statisticsApi = {
   getStatistics: () => request('/statistics'),
+}
+
+export const donationApi = {
+  create: (token, payload) =>
+    request('/donations', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      token,
+    }),
+  receive: (token, payload) =>
+    request('/donations/receive', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      token,
+    }),
+  getMyDonations: (token) => request('/donations/my-donations', { token }),
+  getStatistics: () => request('/donations/statistics'),
+}
+
+export const donationRequestApi = {
+  request: (token, payload) =>
+    request('/donation-requests', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      token,
+    }),
+  getById: (token, requestId) =>
+    request(`/donation-requests/${requestId}`, {
+      token,
+    }),
+  getMyRequests: (token) =>
+    request('/donation-requests/my/requests', {
+      token,
+    }),
+  acceptByOwner: (token, requestId) =>
+    request(`/donation-requests/${requestId}/accept-owner`, {
+      method: 'POST',
+      token,
+    }),
+  acceptByRequester: (token, requestId) =>
+    request(`/donation-requests/${requestId}/accept-requester`, {
+      method: 'POST',
+      token,
+    }),
+  reject: (token, requestId) =>
+    request(`/donation-requests/${requestId}/reject`, {
+      method: 'POST',
+      token,
+    }),
 }

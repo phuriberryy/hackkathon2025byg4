@@ -9,9 +9,11 @@ import HomePage from './pages/HomePage'
 import ProfilePage from './pages/ProfilePage'
 import RegisterPage from './pages/RegisterPage'
 import ExchangeRequestDetailPage from './pages/ExchangeRequestDetailPage'
+import DonationRequestDetailPage from './pages/DonationRequestDetailPage'
 import ItemDetailPage from './pages/ItemDetailPage'
 import PostItemModal from './components/modals/PostItemModal'
 import ExchangeRequestModal from './components/modals/ExchangeRequestModal'
+import DonationRequestModal from './components/modals/DonationRequestModal'
 import NotificationsModal from './components/modals/NotificationsModal'
 import ChatModal from './components/modals/ChatModal'
 import ProtectedRoute from './components/auth/ProtectedRoute'
@@ -24,6 +26,7 @@ function AppContent() {
   const location = useLocation()
   const [postItemOpen, setPostItemOpen] = useState(false)
   const [exchangeRequestOpen, setExchangeRequestOpen] = useState(false)
+  const [donationRequestOpen, setDonationRequestOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
   const [selectedChatId, setSelectedChatId] = useState(null)
@@ -42,6 +45,11 @@ function AppContent() {
   const handleExchangeItem = (itemId) => {
     setSelectedItem(itemId)
     setExchangeRequestOpen(true)
+  }
+
+  const handleDonationItem = (itemId) => {
+    setSelectedItem(itemId)
+    setDonationRequestOpen(true)
   }
 
   const handleNotificationsClick = () => {
@@ -142,6 +150,7 @@ function AppContent() {
               <ProtectedRoute>
               <HomePage 
                 onExchangeItem={handleExchangeItem}
+                onDonationItem={handleDonationItem}
                 onPostItem={handlePostItem}
                 refreshKey={itemsVersion}
               />
@@ -160,7 +169,10 @@ function AppContent() {
             path="/items/:itemId"
             element={
               <ProtectedRoute>
-                <ItemDetailPage onExchangeItem={handleExchangeItem} />
+                <ItemDetailPage 
+                  onExchangeItem={handleExchangeItem}
+                  onDonationItem={handleDonationItem}
+                />
               </ProtectedRoute>
             }
           />
@@ -169,6 +181,14 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <ExchangeRequestDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/donation-requests/:requestId"
+            element={
+              <ProtectedRoute>
+                <DonationRequestDetailPage />
               </ProtectedRoute>
             }
           />
@@ -196,6 +216,14 @@ function AppContent() {
         open={exchangeRequestOpen}
         onClose={() => {
           setExchangeRequestOpen(false)
+          setSelectedItem(null)
+        }}
+        itemId={selectedItem}
+      />
+      <DonationRequestModal
+        open={donationRequestOpen}
+        onClose={() => {
+          setDonationRequestOpen(false)
           setSelectedItem(null)
         }}
         itemId={selectedItem}

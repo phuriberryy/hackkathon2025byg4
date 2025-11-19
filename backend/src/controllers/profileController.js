@@ -53,23 +53,27 @@ export const getMyItems = async (req, res) => {
   }
 
   try {
+    // ใช้ SQL query เพื่อตรวจสอบ expired โดยตรง เพื่อความแม่นยำ
+    // available_until <= CURRENT_DATE หมายถึง expired (รวมถึง 0 days remaining)
     const result = await query(
-      `SELECT * FROM items 
+      `SELECT *,
+       CASE 
+         WHEN available_until IS NOT NULL 
+              AND available_until <= CURRENT_DATE 
+              AND status != 'exchanged' 
+         THEN true 
+         ELSE false 
+       END as is_expired
+       FROM items 
        WHERE user_id=$1 
        ORDER BY created_at DESC`,
       [req.user.id]
     )
-
-    // แยก items ที่หมดอายุแล้วแต่ยังไม่ถูกแลกเปลี่ยน
-    const today = new Date().toISOString().split('T')[0]
-    const items = result.rows.map(item => {
-      const isExpired = item.available_until && item.available_until < today
-      const isNotExchanged = item.status !== 'exchanged'
-      return {
-        ...item,
-        is_expired: isExpired && isNotExchanged
-      }
-    })
+    
+    const items = result.rows.map(item => ({
+      ...item,
+      is_expired: item.is_expired === true || item.is_expired === 'true'
+    }))
 
     return res.json(items)
   } catch (err) {
@@ -161,9 +165,15 @@ export const getExchangeHistory = async (req, res) => {
     const result = await query(
       `SELECT 
         eh.*,
-        i.title as item_title,
-        i.image_url as item_image_url,
-        i.category as item_category,
+        -- Owner item (ของของฉัน หรือ ของที่แลกออกไป)
+        i.title as owner_item_title,
+        i.image_url as owner_item_image_url,
+        i.category as owner_item_category,
+        -- Requester item (ของที่ได้รับ หรือ ของที่แลกเข้ามา)
+        er.requester_item_name as requester_item_title,
+        er.requester_item_image_url as requester_item_image_url,
+        er.requester_item_category as requester_item_category,
+        -- User info
         owner.name as owner_name,
         owner.email as owner_email,
         requester.name as requester_name,
@@ -174,6 +184,7 @@ export const getExchangeHistory = async (req, res) => {
         END as user_role
        FROM exchange_history eh
        JOIN items i ON eh.item_id = i.id
+       LEFT JOIN exchange_requests er ON eh.exchange_request_id = er.id
        JOIN users owner ON eh.owner_id = owner.id
        JOIN users requester ON eh.requester_id = requester.id
        WHERE eh.owner_id = $1 OR eh.requester_id = $1
@@ -181,7 +192,42 @@ export const getExchangeHistory = async (req, res) => {
       [req.user.id]
     )
 
-    return res.json(result.rows)
+    // แปลงข้อมูลให้เหมาะสมกับ frontend
+    const formattedResults = result.rows.map(row => {
+      // ถ้า user เป็น owner: owner item = ของของฉัน, requester item = ของที่ได้รับ
+      // ถ้า user เป็น requester: requester item = ของของฉัน, owner item = ของที่ได้รับ
+      if (row.user_role === 'owner') {
+        return {
+          ...row,
+          my_item_title: row.owner_item_title,
+          my_item_image_url: row.owner_item_image_url,
+          my_item_category: row.owner_item_category,
+          received_item_title: row.requester_item_title,
+          received_item_image_url: row.requester_item_image_url,
+          received_item_category: row.requester_item_category,
+          received_from_name: row.requester_name,
+          // สำหรับ backward compatibility
+          item_title: row.owner_item_title,
+          item_image_url: row.owner_item_image_url,
+        }
+      } else {
+        return {
+          ...row,
+          my_item_title: row.requester_item_title,
+          my_item_image_url: row.requester_item_image_url,
+          my_item_category: row.requester_item_category,
+          received_item_title: row.owner_item_title,
+          received_item_image_url: row.owner_item_image_url,
+          received_item_category: row.owner_item_category,
+          received_from_name: row.owner_name,
+          // สำหรับ backward compatibility
+          item_title: row.requester_item_title,
+          item_image_url: row.requester_item_image_url,
+        }
+      }
+    })
+
+    return res.json(formattedResults)
   } catch (err) {
     console.error('Get exchange history error:', err)
     return res.status(500).json({ message: 'Internal server error' })

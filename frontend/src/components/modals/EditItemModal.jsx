@@ -222,6 +222,7 @@ export default function EditItemModal({ open, onClose, item, onSuccess }) {
             name="availableUntil"
             value={formData.availableUntil}
             onChange={handleInputChange}
+            min={new Date().toISOString().split('T')[0]}
             className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-0"
             required
           />

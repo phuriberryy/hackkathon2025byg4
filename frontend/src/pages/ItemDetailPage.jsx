@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
   MapPin,
@@ -9,14 +9,16 @@ import {
   Zap,
   Clock3,
   AlertCircle,
+  Heart,
 } from 'lucide-react'
 import { itemsApi } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import { calculateItemCO2 } from '../utils/co2Calculator'
 
-export default function ItemDetailPage({ onExchangeItem }) {
+export default function ItemDetailPage({ onExchangeItem, onDonationItem }) {
   const { itemId } = useParams()
-  const { user } = useAuth()
+  const navigate = useNavigate()
+  const { user, token } = useAuth()
   const [item, setItem] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -51,6 +53,7 @@ export default function ItemDetailPage({ onExchangeItem }) {
     }
   }
 
+
   const formatDate = (dateString) => {
     if (!dateString) return 'Not specified'
     const date = new Date(dateString)
@@ -63,8 +66,11 @@ export default function ItemDetailPage({ onExchangeItem }) {
 
   const getDaysRemaining = (dateString) => {
     if (!dateString) return null
+    // ใช้การเปรียบเทียบวันที่ (ไม่สนใจเวลา) เพื่อให้สอดคล้องกับ backend
     const today = new Date()
+    today.setHours(0, 0, 0, 0)
     const expiryDate = new Date(dateString)
+    expiryDate.setHours(0, 0, 0, 0)
     const diffTime = expiryDate - today
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
     return diffDays
@@ -178,6 +184,10 @@ export default function ItemDetailPage({ onExchangeItem }) {
               <span className="rounded-full bg-yellow-500 px-4 py-2 text-sm font-semibold text-white shadow-md">
                 In progress
               </span>
+            ) : item.listing_type === 'donation' ? (
+              <span className="rounded-full bg-red-500 px-4 py-2 text-sm font-semibold text-white">
+                Donation
+              </span>
             ) : (
               <span className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white">
                 Exchange
@@ -283,15 +293,26 @@ export default function ItemDetailPage({ onExchangeItem }) {
             </div>
           </div>
 
-          {/* Looking For */}
-          <div className="mb-6 rounded-xl bg-yellow-50 p-4">
-            <p className="mb-2 text-sm font-semibold text-yellow-900">Looking for:</p>
-            <p className="text-yellow-800">{item.looking_for || 'Not specified'}</p>
-          </div>
+          {/* Looking For - Only show for exchange items */}
+          {item.listing_type !== 'donation' && (
+            <div className="mb-6 rounded-xl bg-yellow-50 p-4">
+              <p className="mb-2 text-sm font-semibold text-yellow-900">Looking for:</p>
+              <p className="text-yellow-800">{item.looking_for || 'Not specified'}</p>
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex flex-col gap-3 sm:flex-row">
-            {!isOwner && !isInProgress && (
+            {!isOwner && !isInProgress && item.status === 'active' && item.listing_type === 'donation' && (
+              <button
+                onClick={() => onDonationItem(item.id)}
+                className="flex-1 rounded-full bg-red-500 px-6 py-3 text-base font-semibold text-white shadow-md transition hover:bg-red-600 flex items-center justify-center gap-2"
+              >
+                <Heart size={20} />
+                Request Donation
+              </button>
+            )}
+            {!isOwner && !isInProgress && item.status === 'active' && item.listing_type !== 'donation' && (
               <button
                 onClick={handleExchange}
                 className="flex-1 rounded-full bg-primary px-6 py-3 text-base font-semibold text-white shadow-md transition hover:bg-primary-dark"
@@ -299,7 +320,7 @@ export default function ItemDetailPage({ onExchangeItem }) {
                 Request Exchange
               </button>
             )}
-            {isOwner && (
+            {isOwner && item.status === 'active' && (
               <div className="flex-1 rounded-xl bg-blue-50 p-4 text-center">
                 <p className="text-sm font-semibold text-blue-900">This is your item</p>
                 <p className="mt-1 text-xs text-blue-700">You can manage this item on the Profile page</p>
@@ -310,9 +331,18 @@ export default function ItemDetailPage({ onExchangeItem }) {
                 <p className="text-sm font-semibold text-yellow-900">This item is currently in the exchange process</p>
               </div>
             )}
+            {item.status === 'donated' && (
+              <div className="flex-1 rounded-xl bg-green-50 p-4 text-center">
+                <p className="text-sm font-semibold text-green-900 flex items-center justify-center gap-2">
+                  <Heart size={20} className="text-green-600" />
+                  This item has been donated
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
+
     </div>
   )
 }

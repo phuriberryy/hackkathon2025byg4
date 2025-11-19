@@ -174,11 +174,12 @@ export const createChat = async (req, res) => {
   }
 
   const isExchangeChat = Boolean(exchangeRequestId)
+  const isDonationChat = Boolean(req.body.donationRequestId)
   const insertResult = await query(
-    `INSERT INTO chats (creator_id, participant_id, item_id, exchange_request_id)
-     VALUES ($1,$2,$3,$4)
+    `INSERT INTO chats (creator_id, participant_id, item_id, exchange_request_id, donation_request_id)
+     VALUES ($1,$2,$3,$4,$5)
      RETURNING id`,
-    [req.user.id, participant, itemId || null, exchangeRequestId || null]
+    [req.user.id, participant, itemId || null, exchangeRequestId || null, req.body.donationRequestId || null]
   )
 
   const chatId = insertResult.rows[0].id
@@ -234,7 +235,7 @@ export const acceptChat = async (req, res) => {
     // ตรวจสอบว่า chat ถูกปิดแล้วหรือไม่ แต่ถ้าเป็น exchange chat ที่ทั้งสองฝ่าย accept แล้ว
     // และ status ยังเป็น 'declined' อาจจะต้อง reset กลับเป็น 'active'
     if (chatRow.status === 'declined' && chatRow.closed_at) {
-      // ถ้าเป็น exchange chat และทั้งสองฝ่าย accept แล้ว ให้ reset กลับเป็น active
+      // ถ้าเป็น exchange/donation chat และทั้งสองฝ่าย accept แล้ว ให้ reset กลับเป็น active
       if (chatRow.exchange_request_id) {
         const exchangeRequestResult = await query(
           `SELECT owner_accepted, requester_accepted, status 
@@ -261,13 +262,39 @@ export const acceptChat = async (req, res) => {
         } else {
           return res.status(400).json({ message: 'Chat has been closed' })
         }
+      } else if (chatRow.donation_request_id) {
+        const donationRequestResult = await query(
+          `SELECT owner_accepted, requester_accepted, status 
+           FROM donation_requests 
+           WHERE id=$1`,
+          [chatRow.donation_request_id]
+        )
+        if (donationRequestResult.rowCount > 0) {
+          const dr = donationRequestResult.rows[0]
+          // ถ้าทั้งสองฝ่าย accept แล้ว ให้ reset chat status
+          if (dr.owner_accepted && dr.requester_accepted && dr.status === 'chatting') {
+            await query(
+              `UPDATE chats 
+               SET status='active',
+                   closed_at=NULL,
+                   updated_at=NOW()
+               WHERE id=$1`,
+              [chatId]
+            )
+            chatRow = await fetchChatById(chatId)
+          } else {
+            return res.status(400).json({ message: 'Chat has been closed' })
+          }
+        } else {
+          return res.status(400).json({ message: 'Chat has been closed' })
+        }
       } else {
         return res.status(400).json({ message: 'Chat has been closed' })
       }
     }
 
-    if (!chatRow.exchange_request_id) {
-      return res.status(400).json({ message: 'Chat confirmation is only available for exchange chats' })
+    if (!chatRow.exchange_request_id && !chatRow.donation_request_id) {
+      return res.status(400).json({ message: 'Chat confirmation is only available for exchange or donation chats' })
     }
 
     const role = resolveChatRole(chatRow, req.user.id)
@@ -287,7 +314,8 @@ export const acceptChat = async (req, res) => {
       // ถ้าทั้งสองฝ่าย accept แล้วแต่ยังไม่มี QR code ให้สร้างเลย
       if (chatRow.owner_accepted && chatRow.requester_accepted && !chatRow.qr_code) {
         try {
-          const qrCode = generateExchangeCode()
+          const isDonationChat = Boolean(chatRow.donation_request_id)
+          const qrCode = isDonationChat ? generateDonationCode() : generateExchangeCode()
           await query(
             `UPDATE chats 
              SET qr_code=$2,
@@ -317,7 +345,8 @@ export const acceptChat = async (req, res) => {
     // เช็คว่าทั้งสองฝ่าย accept และ QR Code ยังไม่เคยถูกสร้าง
     if (chatRow && chatRow.owner_accepted && chatRow.requester_accepted && !chatRow.qr_code) {
       try {
-        const qrCode = generateExchangeCode() // สร้าง code ใหม่เลย ไม่ต้อง check `||`
+        const isDonationChat = Boolean(chatRow.donation_request_id)
+        const qrCode = isDonationChat ? generateDonationCode() : generateExchangeCode() // สร้าง code ใหม่เลย ไม่ต้อง check `||`
         await query(
           `UPDATE chats 
            SET qr_code=$2,
@@ -328,7 +357,7 @@ export const acceptChat = async (req, res) => {
         )
         chatRow = await fetchChatById(chatId)
         
-        // เมื่อทั้งสองฝ่าย accept ใน chat แล้ว ให้เปลี่ยน item status เป็น 'exchanged' (หายจากหน้าฟีด)
+        // เมื่อทั้งสองฝ่าย accept ใน chat แล้ว ให้เปลี่ยน item status
         if (chatRow && chatRow.exchange_request_id) {
           const exchangeRequestResult = await query(
             `SELECT er.item_id, er.owner_id, er.requester_id, i.category, i.item_condition
@@ -374,7 +403,42 @@ export const acceptChat = async (req, res) => {
                  VALUES ($1,$2,$3,$4,$5)`,
                 [chatRow.exchange_request_id, itemId, exchangeData.owner_id, exchangeData.requester_id, parseFloat(co2Reduced.toFixed(2))]
               )
+              
+              // Emit socket event for real-time update
+              const io = getChatServer()
+              if (io) {
+                io.emit('exchange:completed')
+              }
             }
+          }
+        } else if (chatRow && chatRow.donation_request_id) {
+          // สำหรับ donation requests - ทำเหมือน exchange
+          const donationRequestResult = await query(
+            `SELECT dr.item_id, dr.requester_id, i.user_id as owner_id, i.category, i.item_condition
+             FROM donation_requests dr
+             JOIN items i ON dr.item_id = i.id
+             WHERE dr.id=$1`,
+            [chatRow.donation_request_id]
+          )
+          if (donationRequestResult.rowCount > 0) {
+            const donationData = donationRequestResult.rows[0]
+            const itemId = donationData.item_id
+            
+            // เปลี่ยน item status เป็น 'in_progress' (เหมือน exchange)
+            await query(
+              `UPDATE items 
+               SET status='in_progress', updated_at=NOW()
+               WHERE id=$1`,
+              [itemId]
+            )
+            
+            // อัปเดต donation_request status เป็น 'in_progress' (เหมือน exchange)
+            await query(
+              `UPDATE donation_requests 
+               SET status='in_progress', updated_at=NOW()
+               WHERE id=$1`,
+              [chatRow.donation_request_id]
+            )
           }
         }
       } catch (err) {
@@ -441,7 +505,7 @@ export const declineChat = async (req, res) => {
 
   chatRow = await fetchChatById(chatId)
   
-  // เมื่อ reject ใน chat ให้เปลี่ยน item status กลับเป็น 'active' และ exchange_request status กลับเป็น 'pending'
+  // เมื่อ reject ใน chat ให้เปลี่ยน item status กลับเป็น 'active' และ request status กลับเป็น 'pending'
   if (chatRow && chatRow.exchange_request_id) {
     try {
       const exchangeRequestResult = await query(
@@ -470,6 +534,36 @@ export const declineChat = async (req, res) => {
       }
     } catch (err) {
       console.error('Failed to revert item status:', err)
+      // ไม่ throw error เพื่อไม่ให้การ decline ล้มเหลว
+    }
+  } else if (chatRow && chatRow.donation_request_id) {
+    try {
+      const donationRequestResult = await query(
+        `SELECT item_id FROM donation_requests WHERE id=$1`,
+        [chatRow.donation_request_id]
+      )
+      if (donationRequestResult.rowCount > 0) {
+        const itemId = donationRequestResult.rows[0].item_id
+        // เปลี่ยน item status กลับเป็น 'active'
+        await query(
+          `UPDATE items 
+           SET status='active', updated_at=NOW()
+           WHERE id=$1`,
+          [itemId]
+        )
+        // เปลี่ยน donation_request status กลับเป็น 'pending'
+        await query(
+          `UPDATE donation_requests 
+           SET status='pending', 
+               owner_accepted=FALSE,
+               requester_accepted=FALSE,
+               updated_at=NOW()
+           WHERE id=$1`,
+          [chatRow.donation_request_id]
+        )
+      }
+    } catch (err) {
+      console.error('Failed to revert donation item status:', err)
       // ไม่ throw error เพื่อไม่ให้การ decline ล้มเหลว
     }
   }
@@ -583,6 +677,12 @@ export const confirmChatQr = async (req, res) => {
             ]
           )
           
+          // Emit socket event for real-time update
+          const io = getChatServer()
+          if (io) {
+            io.emit('exchange:completed')
+          }
+          
           // อัปเดต item status เป็น 'exchanged'
           await query(
             `UPDATE items SET status='exchanged', updated_at=NOW() WHERE id=$1`,
@@ -598,6 +698,76 @@ export const confirmChatQr = async (req, res) => {
       }
     } catch (err) {
       console.error('Failed to create exchange history:', err)
+      // ไม่ throw error เพื่อไม่ให้การยืนยัน QR ล้มเหลว
+    }
+  }
+
+  // สร้าง donation history เมื่อยืนยัน QR code สำหรับ donation (ถ้ายังไม่มี)
+  if (chatRow.donation_request_id) {
+    try {
+      const existingHistory = await query(
+        `SELECT id FROM donation_history WHERE recipient_id=$1 AND item_id IN (SELECT item_id FROM donation_requests WHERE id=$2)`,
+        [req.user.id, chatRow.donation_request_id]
+      )
+      
+      if (!existingHistory.rowCount) {
+        // ดึงข้อมูล donation request และ item
+        const donationRequestResult = await query(
+          `SELECT 
+            dr.item_id,
+            dr.requester_id,
+            i.user_id as owner_id,
+            i.category as item_category,
+            i.item_condition as item_condition
+           FROM donation_requests dr
+           JOIN items i ON dr.item_id = i.id
+           WHERE dr.id=$1`,
+          [chatRow.donation_request_id]
+        )
+        
+        if (donationRequestResult.rowCount > 0) {
+          const donationData = donationRequestResult.rows[0]
+          
+          // คำนวณ CO₂ footprint ของ item
+          const co2Footprint = calculateItemCO2(
+            donationData.item_category,
+            donationData.item_condition
+          )
+          const co2Reduced = co2Footprint * 0.8 // 80% reduction
+          
+          // สร้าง donation history
+          await query(
+            `INSERT INTO donation_history (item_id, donor_id, recipient_id, co2_reduced)
+             VALUES ($1, $2, $3, $4)`,
+            [
+              donationData.item_id,
+              donationData.owner_id, // donor_id = เจ้าของโพสต์
+              donationData.requester_id, // recipient_id = ผู้รับบริจาค
+              parseFloat(co2Reduced.toFixed(2))
+            ]
+          )
+          
+          // อัปเดต item status เป็น 'donated'
+          await query(
+            `UPDATE items SET status='donated', updated_at=NOW() WHERE id=$1`,
+            [donationData.item_id]
+          )
+          
+               // อัปเดต donation_request status เป็น 'completed'
+               await query(
+                 `UPDATE donation_requests SET status='completed', updated_at=NOW() WHERE id=$1`,
+                 [chatRow.donation_request_id]
+               )
+               
+               // Emit socket event for real-time update
+               const io = getChatServer()
+               if (io) {
+                 io.emit('donation:completed')
+               }
+             }
+           }
+         } catch (err) {
+           console.error('Failed to create donation history:', err)
       // ไม่ throw error เพื่อไม่ให้การยืนยัน QR ล้มเหลว
     }
   }
@@ -633,7 +803,8 @@ async function fetchChatById(chatId) {
     JOIN users creator ON c.creator_id = creator.id
     JOIN users participant ON c.participant_id = participant.id
     LEFT JOIN exchange_requests er ON c.exchange_request_id = er.id
-    LEFT JOIN items item ON COALESCE(c.item_id, er.item_id) = item.id
+    LEFT JOIN donation_requests dr ON c.donation_request_id = dr.id
+    LEFT JOIN items item ON COALESCE(c.item_id, er.item_id, dr.item_id) = item.id
     LEFT JOIN LATERAL (
       SELECT m.id, m.body, m.sender_id, m.created_at
       FROM messages m
@@ -675,7 +846,8 @@ async function fetchChatsForUser(userId) {
     JOIN users creator ON c.creator_id = creator.id
     JOIN users participant ON c.participant_id = participant.id
     LEFT JOIN exchange_requests er ON c.exchange_request_id = er.id
-    LEFT JOIN items item ON COALESCE(c.item_id, er.item_id) = item.id
+    LEFT JOIN donation_requests dr ON c.donation_request_id = dr.id
+    LEFT JOIN items item ON COALESCE(c.item_id, er.item_id, dr.item_id) = item.id
     LEFT JOIN LATERAL (
       SELECT m.id, m.body, m.sender_id, m.created_at
       FROM messages m
@@ -719,10 +891,11 @@ function mapChatRow(row, currentUserId) {
   const role = resolveChatRole(row, currentUserId)
   const status = row.status || 'pending'
   const isExchangeChat = Boolean(row.exchange_request_id)
-  // สำหรับ exchange chat ต้องทั้งสองฝ่ายยอมรับแล้วถึงจะแชทได้
+  const isDonationChat = Boolean(row.donation_request_id)
+  // สำหรับ exchange/donation chat ต้องทั้งสองฝ่ายยอมรับแล้วถึงจะแชทได้
   const bothAccepted = row.owner_accepted && row.requester_accepted
   // หลังจากยืนยัน QR แล้วไม่สามารถส่งข้อความได้อีก
-  const canSendMessages = status !== 'declined' && !row.closed_at && !row.qr_confirmed && (!isExchangeChat || bothAccepted)
+  const canSendMessages = status !== 'declined' && !row.closed_at && !row.qr_confirmed && (!isExchangeChat && !isDonationChat || bothAccepted)
 
   return {
     id: row.id,
@@ -748,8 +921,11 @@ function mapChatRow(row, currentUserId) {
     itemImageUrl: row.item_image_url,
     exchangeRequestId: row.exchange_request_id,
     exchangeStatus: row.exchange_request_status,
+    donationRequestId: row.donation_request_id,
+    donationStatus: row.donation_request_status,
     role,
     isExchangeChat,
+    isDonationChat,
     canSendMessages,
     last_message: row.last_message_id
       ? {
@@ -767,9 +943,10 @@ function resolveChatRole(row, userId) {
   const itemOwnerId = row.item_owner_id || row.creator_id
   const requesterId =
     row.exchange_request_requester_id ||
+    row.donation_request_requester_id ||
     (row.creator_id === itemOwnerId ? row.participant_id : row.creator_id)
 
-  if (row.exchange_request_id) {
+  if (row.exchange_request_id || row.donation_request_id) {
     if (userId === itemOwnerId) return 'owner'
     if (userId === requesterId) return 'requester'
     if (userId === row.creator_id) return 'creator'
@@ -809,4 +986,9 @@ function broadcastChatUpdate(chatRow) {
 function generateExchangeCode() {
   const random = randomBytes(4).readUInt32BE(0) % 100000000
   return `EX${random.toString().padStart(8, '0')}`
+}
+
+function generateDonationCode() {
+  const random = randomBytes(4).readUInt32BE(0) % 100000000
+  return `DN${random.toString().padStart(8, '0')}`
 }

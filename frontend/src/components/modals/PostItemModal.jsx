@@ -13,6 +13,7 @@ export default function PostItemModal({ open, onClose, onSuccess }) {
     availableUntil: '',
     pickupLocation: '',
     description: '',
+    listingType: 'exchange', // 'exchange' or 'donation'
   })
   const [imagePreview, setImagePreview] = useState(null)
   const [submitting, setSubmitting] = useState(false)
@@ -37,7 +38,21 @@ export default function PostItemModal({ open, onClose, onSuccess }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!token) {
-      alert('Please log in before posting item for exchange')
+      alert('Please log in before posting item')
+      return
+    }
+    // Validate required fields
+    if (!imagePreview) {
+      alert('Please upload an image')
+      return
+    }
+    if (!formData.itemName || !formData.category || !formData.condition) {
+      alert('Please fill in all required fields')
+      return
+    }
+    // Validate lookingFor only for exchange type
+    if (formData.listingType === 'exchange' && !formData.lookingFor) {
+      alert('Please specify what you are looking for in exchange')
       return
     }
     setSubmitting(true)
@@ -51,6 +66,7 @@ export default function PostItemModal({ open, onClose, onSuccess }) {
         availableUntil: formData.availableUntil,
         imageUrl: imagePreview,
         pickupLocation: formData.pickupLocation,
+        listingType: formData.listingType,
       })
       onSuccess?.()
       onClose()
@@ -62,6 +78,7 @@ export default function PostItemModal({ open, onClose, onSuccess }) {
         availableUntil: '',
         pickupLocation: '',
         description: '',
+        listingType: 'exchange',
       })
       setImagePreview(null)
     } catch (err) {
@@ -94,11 +111,41 @@ export default function PostItemModal({ open, onClose, onSuccess }) {
     <Modal
       open={open}
       onClose={onClose}
-      title="Post Item for Exchange"
-      subtitle="Post an item you want to exchange with CMU students"
+      title={formData.listingType === 'donation' ? 'Post Item for Donation' : 'Post Item for Exchange'}
+      subtitle={formData.listingType === 'donation' ? 'Post an item you want to donate to CMU students' : 'Post an item you want to exchange with CMU students'}
       size="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Listing Type Selection */}
+        <div>
+          <label className="mb-2 block text-sm font-bold text-gray-900">
+            Listing Type <span className="text-red-500">*</span>
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setFormData((prev) => ({ ...prev, listingType: 'exchange' }))}
+              className={`rounded-xl border-2 px-4 py-3 text-sm font-semibold transition ${
+                formData.listingType === 'exchange'
+                  ? 'border-primary bg-primary text-white'
+                  : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              🔄 Exchange
+            </button>
+            <button
+              type="button"
+              onClick={() => setFormData((prev) => ({ ...prev, listingType: 'donation' }))}
+              className={`rounded-xl border-2 px-4 py-3 text-sm font-semibold transition ${
+                formData.listingType === 'donation'
+                  ? 'border-red-500 bg-red-500 text-white'
+                  : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              ❤️ Donation
+            </button>
+          </div>
+        </div>
         {/* Image Upload */}
         <div>
           <label className="mb-2 block text-sm font-bold text-gray-900">
@@ -110,7 +157,7 @@ export default function PostItemModal({ open, onClose, onSuccess }) {
             onChange={handleImageChange}
             className="hidden"
             id="image-upload"
-            required
+            name="image"
           />
           <label
             htmlFor="image-upload"
@@ -190,24 +237,26 @@ export default function PostItemModal({ open, onClose, onSuccess }) {
           </div>
         </div>
 
-        {/* Looking to Exchange For */}
-        <div>
-          <label className="mb-2 block text-sm font-bold text-gray-900">
-            Looking to Exchange For <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            name="lookingFor"
-            value={formData.lookingFor}
-            onChange={handleInputChange}
-            placeholder="e.g., Laptop stand, Kitchen utensils, Study desk"
-            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-0"
-            required
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            Let others know what you're looking for in exchange.
-          </p>
-        </div>
+        {/* Looking to Exchange For - Only show for exchange type */}
+        {formData.listingType === 'exchange' && (
+          <div>
+            <label className="mb-2 block text-sm font-bold text-gray-900">
+              Looking to Exchange For <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              name="lookingFor"
+              value={formData.lookingFor}
+              onChange={handleInputChange}
+              placeholder="e.g., Laptop stand, Kitchen utensils, Study desk"
+              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-0"
+              required
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Let others know what you're looking for in exchange.
+            </p>
+          </div>
+        )}
 
         {/* Expiration Date */}
         <div>
@@ -220,6 +269,7 @@ export default function PostItemModal({ open, onClose, onSuccess }) {
               name="availableUntil"
               value={formData.availableUntil}
               onChange={handleInputChange}
+              min={new Date().toISOString().split('T')[0]}
               className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-0"
               required
             />
